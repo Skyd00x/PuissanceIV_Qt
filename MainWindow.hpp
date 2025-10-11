@@ -6,6 +6,7 @@
 #include "GameUI.hpp"
 #include "StateMachine.hpp"
 #include "Robot.hpp"
+#include "IntroScreen.hpp"
 
 class MainWindow : public QMainWindow
 {
@@ -17,6 +18,7 @@ public:
 
 private:
     QStackedWidget *stack;
+    IntroScreen *introScreen;
     MainMenu *mainMenu;
     GameUI *gameUI;
     Robot *robot;

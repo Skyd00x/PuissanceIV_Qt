@@ -1,13 +1,12 @@
 #include "MainWindow.hpp"
-#include <QApplication>
 #include <QDebug>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
-    // === Configuration de la fenêtre principale ===
     resize(1280, 720);
-    setWindowTitle("Puissance IV - Projet Polytech Tours");
+    setWindowTitle("Puissance IV");
+    showMaximized();
 
     // === Création du conteneur de vues ===
     stack = new QStackedWidget(this);
@@ -17,15 +16,24 @@ MainWindow::MainWindow(QWidget *parent)
     robot = new Robot();
 
     // === Création des écrans ===
+    introScreen = new IntroScreen();
     mainMenu = new MainMenu();
     gameUI   = new GameUI(robot);
 
-    stack->addWidget(mainMenu); // index 0
-    stack->addWidget(gameUI);   // index 1
+    // === Ajout dans la pile ===
+    stack->addWidget(introScreen); // index 0
+    stack->addWidget(mainMenu);    // index 1
+    stack->addWidget(gameUI);      // index 2
 
-    stack->setCurrentWidget(mainMenu);
+    stack->setCurrentWidget(introScreen);
 
-    // === Connexions entre les vues ===
+    // === Transition automatique après l’intro ===
+    connect(introScreen, &IntroScreen::introFinished, this, [this]() {
+        qDebug() << "🎬 Fin de l’intro → affichage du menu principal";
+        stack->setCurrentWidget(mainMenu);
+    });
+
+    // === Connexions existantes ===
     connect(mainMenu, &MainMenu::playClicked, this, [this]() {
         qDebug() << "➡️ Passage à la fenêtre de jeu";
         stack->setCurrentWidget(gameUI);
@@ -43,11 +51,15 @@ MainWindow::MainWindow(QWidget *parent)
                 qDebug() << "🎚️ Difficulté sélectionnée:" << (int)diff << p1 << p2 << p3;
                 stateMachine.setDifficulty(diff, p1, p2, p3);
             });
+
+    // === Lancement de l’intro ===
+    introScreen->start();
 }
 
 MainWindow::~MainWindow()
 {
     delete gameUI;
     delete mainMenu;
+    delete introScreen;
     delete robot;
 }
