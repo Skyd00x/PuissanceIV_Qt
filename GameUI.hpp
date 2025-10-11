@@ -22,11 +22,13 @@ public:
     explicit GameUI(Robot* robot, QWidget *parent = nullptr);
     ~GameUI();
 
-    void updateCameraFrame(const cv::Mat& frame);
     void updateBoard(const Board& board);
     void playerVictory();
     void playerDefeat();
     void resetBoard();
+
+public slots:
+    void updateCameraFrame(const QImage &image);
 
 signals:
     void backClicked();

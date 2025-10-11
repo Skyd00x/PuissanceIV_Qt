@@ -1,5 +1,6 @@
 #include "MainWindow.hpp"
 #include <QDebug>
+#include <QCloseEvent>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -8,58 +9,63 @@ MainWindow::MainWindow(QWidget *parent)
     setWindowTitle("Puissance IV");
     showMaximized();
 
-    // === Création du conteneur de vues ===
     stack = new QStackedWidget(this);
     setCentralWidget(stack);
 
-    // === Initialisation du robot ===
     robot = new Robot();
+    camera = new Camera();   // ✅ on crée la caméra ici
 
-    // === Création des écrans ===
     introScreen = new IntroScreen();
     mainMenu = new MainMenu();
     gameUI   = new GameUI(robot);
 
-    // === Ajout dans la pile ===
-    stack->addWidget(introScreen); // index 0
-    stack->addWidget(mainMenu);    // index 1
-    stack->addWidget(gameUI);      // index 2
-
+    stack->addWidget(introScreen);
+    stack->addWidget(mainMenu);
+    stack->addWidget(gameUI);
     stack->setCurrentWidget(introScreen);
 
-    // === Transition automatique après l’intro ===
+    // ✅ Connexion caméra → GameUI
+    connect(camera, &Camera::frameReady, gameUI, &GameUI::updateCameraFrame);
+    camera->start();  // démarre la capture dès le lancement
+
+    // transitions habituelles
     connect(introScreen, &IntroScreen::introFinished, this, [this]() {
-        qDebug() << "🎬 Fin de l’intro → affichage du menu principal";
         stack->setCurrentWidget(mainMenu);
     });
 
-    // === Connexions existantes ===
     connect(mainMenu, &MainMenu::playClicked, this, [this]() {
-        qDebug() << "➡️ Passage à la fenêtre de jeu";
         stack->setCurrentWidget(gameUI);
         stateMachine.ChangeState(StateMachine::State::Game);
     });
 
     connect(gameUI, &GameUI::backClicked, this, [this]() {
-        qDebug() << "⬅️ Retour au menu principal";
         stack->setCurrentWidget(mainMenu);
         stateMachine.ChangeState(StateMachine::State::MainMenu);
     });
 
     connect(mainMenu, &MainMenu::difficultyChanged,
             this, [this](StateMachine::Difficulty diff, float p1, float p2, float p3) {
-                qDebug() << "🎚️ Difficulté sélectionnée:" << (int)diff << p1 << p2 << p3;
                 stateMachine.setDifficulty(diff, p1, p2, p3);
             });
 
-    // === Lancement de l’intro ===
     introScreen->start();
 }
 
 MainWindow::~MainWindow()
 {
+    if (camera) {
+        camera->stop();     // ✅ arrête la boucle proprement
+        delete camera;
+    }
     delete gameUI;
     delete mainMenu;
     delete introScreen;
     delete robot;
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    qDebug() << "🛑 Fermeture de l’application - arrêt de la caméra";
+    if (camera) camera->stop();   // ✅ ferme proprement la webcam
+    QMainWindow::closeEvent(event);
 }

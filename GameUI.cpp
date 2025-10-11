@@ -81,10 +81,9 @@ void GameUI::onRefillButton() {
     emit refillClicked();
 }
 
-void GameUI::updateCameraFrame(const cv::Mat& frame) {
-    if (frame.empty()) return;
+void GameUI::updateCameraFrame(const QImage &image) {
+    if (image.isNull()) return;
 
-    QImage image(frame.data, frame.cols, frame.rows, frame.step, QImage::Format_BGR888);
     cameraLabel->setPixmap(QPixmap::fromImage(image).scaled(
         cameraLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
 }

@@ -5,6 +5,7 @@
 #include <QMutex>
 #include <QImage>
 #include <opencv2/opencv.hpp>
+#include <QCoreApplication>
 
 class Camera : public QObject
 {
@@ -20,7 +21,7 @@ public:
     cv::Mat getFrame();
 
 signals:
-    void frameReady(const QImage &frame);
+    void frameReady(const QImage &image);
 
 private slots:
     void captureLoop();

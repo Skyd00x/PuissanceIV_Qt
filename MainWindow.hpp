@@ -1,5 +1,4 @@
 #pragma once
-
 #include <QMainWindow>
 #include <QStackedWidget>
 #include "MainMenu.hpp"
@@ -7,6 +6,7 @@
 #include "StateMachine.hpp"
 #include "Robot.hpp"
 #include "IntroScreen.hpp"
+#include "Camera.hpp"   // ✅ important
 
 class MainWindow : public QMainWindow
 {
@@ -16,11 +16,15 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+protected:
+    void closeEvent(QCloseEvent *event) override;  // ✅ ajout
+
 private:
     QStackedWidget *stack;
     IntroScreen *introScreen;
     MainMenu *mainMenu;
     GameUI *gameUI;
     Robot *robot;
+    Camera *camera;       // ✅ référence caméra
     StateMachine stateMachine;
 };
