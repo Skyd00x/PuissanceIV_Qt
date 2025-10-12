@@ -42,6 +42,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
         IntroScreen.hpp IntroScreen.cpp
+        CheckDevicesScreen.hpp CheckDevicesScreen.cpp
     )
     qt_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
 else()

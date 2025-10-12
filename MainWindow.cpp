@@ -12,24 +12,36 @@ MainWindow::MainWindow(QWidget *parent)
     stack = new QStackedWidget(this);
     setCentralWidget(stack);
 
-    robot = new Robot();
-    camera = new Camera();   // ✅ on crée la caméra ici
+    robot  = new Robot();
+    camera = new Camera();
 
     introScreen = new IntroScreen();
-    mainMenu = new MainMenu();
-    gameUI   = new GameUI(robot);
+    checkScreen = new CheckDevicesScreen();
+    mainMenu    = new MainMenu();
+    gameUI      = new GameUI(robot);
 
     stack->addWidget(introScreen);
+    stack->addWidget(checkScreen);
     stack->addWidget(mainMenu);
     stack->addWidget(gameUI);
     stack->setCurrentWidget(introScreen);
 
-    // ✅ Connexion caméra → GameUI
-    connect(camera, &Camera::frameReady, gameUI, &GameUI::updateCameraFrame);
-    camera->start();  // démarre la capture dès le lancement
-
-    // transitions habituelles
     connect(introScreen, &IntroScreen::introFinished, this, [this]() {
+        stack->setCurrentWidget(checkScreen);
+        checkScreen->startChecking();
+    });
+
+    connect(checkScreen, &CheckDevicesScreen::readyToContinue, this, [this]() {
+        qDebug() << "Connexion au robot et démarrage du flux vidéo...";
+
+        if (robot && !robot->connect()) {
+            qWarning() << "Échec de connexion au Dobot.";
+        }
+
+        if (camera) {
+            camera->start();
+        }
+
         stack->setCurrentWidget(mainMenu);
     });
 
@@ -48,24 +60,31 @@ MainWindow::MainWindow(QWidget *parent)
                 stateMachine.setDifficulty(diff, p1, p2, p3);
             });
 
+    connect(camera, &Camera::frameReady, gameUI, &GameUI::updateCameraFrame);
+
     introScreen->start();
 }
 
 MainWindow::~MainWindow()
 {
     if (camera) {
-        camera->stop();     // ✅ arrête la boucle proprement
+        camera->stop();
         delete camera;
     }
+
+    if (robot) {
+        delete robot;
+    }
+
     delete gameUI;
     delete mainMenu;
+    delete checkScreen;
     delete introScreen;
-    delete robot;
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    qDebug() << "🛑 Fermeture de l’application - arrêt de la caméra";
-    if (camera) camera->stop();   // ✅ ferme proprement la webcam
+    qDebug() << "Fermeture de l’application - arrêt des périphériques";
+    if (camera) camera->stop();
     QMainWindow::closeEvent(event);
 }

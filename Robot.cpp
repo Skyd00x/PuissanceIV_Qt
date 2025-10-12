@@ -56,6 +56,13 @@ bool Robot::connect()
     return true;
 }
 
+bool Robot::isAvailable()
+{
+    char dobotNameList[64] = {0};
+    int found = SearchDobot(dobotNameList, sizeof(dobotNameList));
+    return (found > 0);
+}
+
 void Robot::Home()
 {
     std::cout << "🏠 Retour à la position HOME..." << std::endl;

@@ -17,8 +17,8 @@ public:
 
     void start();
     void stop();
-
     cv::Mat getFrame();
+    static bool isAvailable();  // Vérifie si une caméra est détectée
 
 signals:
     void frameReady(const QImage &image);

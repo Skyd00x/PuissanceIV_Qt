@@ -10,7 +10,9 @@ public:
     Robot();
     ~Robot();
 
-    bool connect();
+    bool connect();                // Connexion réelle au Dobot
+    static bool isAvailable();     // ✅ Vérifie simplement si un Dobot est détecté
+
     void Home();
     void Play(int column);
     void Refill();

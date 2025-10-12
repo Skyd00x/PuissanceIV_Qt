@@ -1,23 +1,28 @@
 #include "Camera.hpp"
 #include <QDebug>
 
+bool Camera::isAvailable()
+{
+    cv::VideoCapture testCap(0, cv::CAP_DSHOW);
+    bool available = testCap.isOpened();
+    if (available) testCap.release();
+    return available;
+}
+
 Camera::Camera(QObject *parent)
     : QObject(parent)
 {
-    // On démarre le thread de travail
     moveToThread(&workerThread);
 
-    // Quand le thread démarre, on appelle captureLoop() dans CE thread
     connect(&workerThread, &QThread::started, this, [this]() {
-        qDebug() << "🎥 Capture thread démarré.";
+        qDebug() << "Capture thread démarré.";
         captureLoop();
     });
 
-    // Quand le thread se termine, on libère la caméra
     connect(&workerThread, &QThread::finished, this, [this]() {
         if (cap.isOpened()) {
             cap.release();
-            qDebug() << "📷 Caméra libérée.";
+            qDebug() << "Caméra libérée.";
         }
     });
 }
@@ -56,15 +61,15 @@ cv::Mat Camera::getFrame()
 
 void Camera::captureLoop()
 {
-    cap.open(0, cv::CAP_DSHOW); // Sélectionne la webcam 0
+    cap.open(0, cv::CAP_DSHOW);
 
     if (!cap.isOpened()) {
-        qWarning() << "❌ Erreur : impossible d'ouvrir la caméra.";
+        qWarning() << "Erreur : impossible d'ouvrir la caméra.";
         running = false;
         return;
     }
 
-    qDebug() << "✅ Caméra ouverte avec succès.";
+    qDebug() << "Caméra ouverte avec succès.";
 
     while (running) {
         cv::Mat temp;
@@ -81,12 +86,12 @@ void Camera::captureLoop()
         QImage img = matToQImage(temp);
         emit frameReady(img);
 
-        QThread::msleep(30); // ~30 FPS
-        QCoreApplication::processEvents(); // ✅ permet à Qt de respirer
+        QThread::msleep(30);
+        QCoreApplication::processEvents();
     }
 
     cap.release();
-    qDebug() << "🛑 Capture stoppée.";
+    qDebug() << "Capture stoppée.";
 }
 
 QImage Camera::matToQImage(const cv::Mat &mat)
@@ -96,8 +101,7 @@ QImage Camera::matToQImage(const cv::Mat &mat)
 
     if (mat.type() == CV_8UC3) {
         return QImage(mat.data, mat.cols, mat.rows, mat.step, QImage::Format_BGR888).copy();
-    }
-    else if (mat.type() == CV_8UC1) {
+    } else if (mat.type() == CV_8UC1) {
         return QImage(mat.data, mat.cols, mat.rows, mat.step, QImage::Format_Grayscale8).copy();
     }
 
