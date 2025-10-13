@@ -1,37 +1,61 @@
 #include "StateMachine.hpp"
+#include <iostream>
 
 StateMachine::StateMachine()
 {
-	state = State::MainMenu;
-	difficulty = Difficulty::Medium;
+    state = State::MainMenu;
+    difficulty = Difficulty::Medium;
 }
 
 void StateMachine::ChangeState(State newState)
 {
-	state = newState;
-	std::cout << "State changed to " << state << std::endl;
+    state = newState;
+    std::cout << "State changed to " << state << std::endl;
 }
 
-void StateMachine::setDifficulty(Difficulty newDifficulty, float P1, float P2, float P3)
+void StateMachine::setDifficulty(Difficulty newDifficulty)
 {
-	difficulty = newDifficulty;
-	std::cout << "difficulty changed to " << difficulty << std::endl;
-	Param1 = P1;
-	Param2 = P2;
-	Param3 = P3;
+    difficulty = newDifficulty;
+
+    // === Paramètres internes définis selon la difficulté ===
+    switch (newDifficulty)
+    {
+    case Difficulty::Easy:
+        // Profondeur réduite (exemple pour minimax)
+        Param1 = 6;     // profondeur
+        Param2 = 0;
+        Param3 = 0;
+        std::cout << "Difficulté : Facile (profondeur = " << Param1 << ")\n";
+        break;
+
+    case Difficulty::Medium:
+        // Négamax avec itérations moyennes
+        Param1 = 30000; // itérations
+        Param2 = 0;
+        Param3 = 0;
+        std::cout << "Difficulté : Moyenne (itérations = " << Param1 << ")\n";
+        break;
+
+    case Difficulty::Hard:
+        // MCTS avec paramètres classiques
+        Param1 = 1000;  // itérations
+        Param2 = 50;    // simulations
+        Param3 = 2.5f;  // constante UCB
+        std::cout << "Difficulté : Difficile (it=" << Param1 << ", sim=" << Param2 << ", ucb=" << Param3 << ")\n";
+        break;
+
+    case Difficulty::Impossible:
+        // Version extrême, très longue
+        Param1 = 10000; // itérations
+        Param2 = 150;   // simulations
+        Param3 = 3.5f;  // UCB plus agressif
+        std::cout << "Difficulté : Impossible (it=" << Param1 << ", sim=" << Param2 << ", ucb=" << Param3 << ")\n";
+        break;
+    }
+
+    std::cout << "Difficulty changed to " << newDifficulty << std::endl;
 }
 
-float StateMachine::getParam1()
-{
-	return Param1;
-}
-
-float StateMachine::getParam2()
-{
-	return Param2;
-}
-
-float StateMachine::getParam3()
-{
-	return Param3;
-}
+float StateMachine::getParam1() const { return Param1; }
+float StateMachine::getParam2() const { return Param2; }
+float StateMachine::getParam3() const { return Param3; }

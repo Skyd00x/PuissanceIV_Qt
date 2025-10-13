@@ -31,9 +31,10 @@ CheckDevicesScreen::CheckDevicesScreen(QWidget *parent)
     setStyleSheet("background-color: white;");
     setAttribute(Qt::WA_StyledBackground, true);
 
+    // === Titre principal ===
     QLabel *title = new QLabel("Vérification des équipements nécessaires");
     title->setAlignment(Qt::AlignCenter);
-    title->setStyleSheet("font-size: 28px; font-weight: bold; color: black;");
+    title->setStyleSheet("font-size: 40px; font-weight: bold; color: black;");
 
     // === Icônes caméra et robot ===
     cameraIcon = new QLabel(this);
@@ -71,13 +72,13 @@ CheckDevicesScreen::CheckDevicesScreen(QWidget *parent)
     cameraStatusLabel->setStyleSheet("font-size: 20px; color: black;");
     robotStatusLabel->setStyleSheet("font-size: 20px; color: black;");
 
-    // === Bouton continuer ===
+    // === Bouton continuer (bleu, plus grand) ===
     continueButton = new QPushButton("Continuer", this);
     continueButton->setVisible(false);
     continueButton->setStyleSheet(
-        "QPushButton { background-color: #2ecc71; color: white; font-size: 22px; "
-        "font-weight: bold; border-radius: 12px; padding: 10px 40px; }"
-        "QPushButton:hover { background-color: #27ae60; }"
+        "QPushButton { background-color: #3498db; color: white; font-size: 26px; "
+        "font-weight: bold; border-radius: 15px; padding: 15px 60px; }"
+        "QPushButton:hover { background-color: #2980b9; }"
         );
     connect(continueButton, &QPushButton::clicked, this, &CheckDevicesScreen::onContinueClicked);
 
@@ -95,16 +96,29 @@ CheckDevicesScreen::CheckDevicesScreen(QWidget *parent)
     QHBoxLayout *devicesLayout = new QHBoxLayout;
     devicesLayout->addStretch();
     devicesLayout->addLayout(camLayout);
-    devicesLayout->addSpacing(100);
+    devicesLayout->addSpacing(120);
     devicesLayout->addLayout(robotLayout);
     devicesLayout->addStretch();
 
+    // Conteneur du bouton avec espace réservé pour éviter le décalage
+    QHBoxLayout *buttonLayout = new QHBoxLayout;
+    buttonLayout->addStretch();
+    buttonLayout->addWidget(continueButton);
+    buttonLayout->addStretch();
+
+    QWidget *buttonContainer = new QWidget(this);
+    buttonContainer->setLayout(buttonLayout);
+    buttonContainer->setMinimumHeight(100); // réserve l’espace pour le bouton, même caché
+
+    // === Layout principal ===
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->addWidget(title);
     mainLayout->addStretch();
     mainLayout->addLayout(devicesLayout);
     mainLayout->addStretch();
-    mainLayout->addWidget(continueButton, 0, Qt::AlignCenter);
+    mainLayout->addWidget(buttonContainer, 0, Qt::AlignCenter);
+    mainLayout->setContentsMargins(60, 40, 60, 60);
+    mainLayout->setSpacing(20);
     setLayout(mainLayout);
 
     // === Effet de fondu ===
@@ -148,7 +162,7 @@ void CheckDevicesScreen::updateStatus(bool cameraOk, bool robotOk)
     robotStatusIcon->setPixmap((robotOk ? checkGreen : crossRed)
                                    .scaled(48,48,Qt::KeepAspectRatio,Qt::SmoothTransformation));
 
-    cameraStatusLabel->setText(cameraOk ? "Connecté" : "Non connecté");
+    cameraStatusLabel->setText(cameraOk ? "Connectée" : "Non connectée");
     robotStatusLabel->setText(robotOk ? "Connecté" : "Non connecté");
     cameraStatusLabel->setStyleSheet(QString("font-size:20px; color:%1;").arg(cameraOk ? "green" : "red"));
     robotStatusLabel->setStyleSheet(QString("font-size:20px; color:%1;").arg(robotOk ? "green" : "red"));

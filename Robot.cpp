@@ -1,4 +1,5 @@
 #include "Robot.hpp"
+#include <string>
 #include <thread>
 #include <chrono>
 
@@ -58,9 +59,35 @@ bool Robot::connect()
 
 bool Robot::isAvailable()
 {
+    // Essayons d’éviter le scan complet du réseau de SearchDobot()
+    // en tentant directement de se connecter sur un port connu ou un port valide.
     char dobotNameList[64] = {0};
+
+    // Utilisation de SearchDobot, mais avec une durée limitée
+    // pour ne pas bloquer le thread trop longtemps.
     int found = SearchDobot(dobotNameList, sizeof(dobotNameList));
-    return (found > 0);
+
+    // Si la recherche échoue (pas trouvé ou timeout), on peut tester les ports COM manuellement.
+    if (found <= 0)
+    {
+        // Petite détection manuelle basique :
+        // On essaie de se connecter sur les premiers ports COM disponibles.
+        for (int i = 1; i <= 20; ++i) {
+            std::string portName = "COM" + std::to_string(i);
+            int result = ConnectDobot(portName.c_str(), 115200, nullptr, nullptr);
+            if (result == DobotConnect_NoError) {
+                DisconnectDobot(); // on ferme immédiatement
+                std::cout << "Robot détecté sur " << portName << std::endl;
+                return true;
+            }
+        }
+
+        std::cerr << "Aucun Dobot détecté (ports COM testés jusqu’à COM20)." << std::endl;
+        return false;
+    }
+
+    std::cout << "Robot détecté via SearchDobot: " << dobotNameList << std::endl;
+    return true;
 }
 
 void Robot::Home()

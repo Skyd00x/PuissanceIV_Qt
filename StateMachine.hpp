@@ -4,42 +4,44 @@
 class StateMachine
 {
 public:
-	enum State {
-		MainMenu,
-		Game,
-		Options,
-		Quit
-	};
+    enum State {
+        Intro,
+        CheckDevices,
+        MainMenu,
+        Game,
+        Calibration,
+        Explanation,
+        Options,
+        Quit
+    };
 
-	enum Difficulty {
-		Easy,
-		Medium,
-		Hard
-	};
+    enum Difficulty {
+        Easy,
+        Medium,
+        Hard,
+        Impossible
+    };
 
-	StateMachine();
+    StateMachine();
 
-	void ChangeState(State newState);
-	void setDifficulty(Difficulty newDifficulty, float Param1, float Param2, float Param3);
+    void ChangeState(State newState);
+    void setDifficulty(Difficulty newDifficulty);
 
-	State getState() { return state; }
-	Difficulty getDifficulty() const { return difficulty; }
+    State getState() const { return state; }
+    Difficulty getDifficulty() const { return difficulty; }
 
-	bool isState(State stateToCompare) { return state == stateToCompare; }
+    bool isState(State stateToCompare) const { return state == stateToCompare; }
 
-	float getParam1();
-	float getParam2();
-	float getParam3();
+    float getParam1() const;
+    float getParam2() const;
+    float getParam3() const;
 
 private:
-	State state;
-	Difficulty difficulty;
+    State state;
+    Difficulty difficulty;
 
-	// the param of algo
-	float Param1 = 0;
-	float Param2 = 0;
-	float Param3 = 0;
-
-
+    // Paramètres internes (par ex. profondeur, itérations, etc.)
+    float Param1 = 0;
+    float Param2 = 0;
+    float Param3 = 0;
 };
-

@@ -9,6 +9,8 @@
 #include "IntroScreen.hpp"
 #include "Camera.hpp"
 #include "CheckDevicesScreen.hpp"
+#include "CalibrationScreen.hpp"
+#include "ExplanationScreen.hpp"
 
 class MainWindow : public QMainWindow
 {
@@ -18,15 +20,25 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+    // Pour debug rapide
+    void showIntro();
+    void showCheck();
+    void showMenu();
+    void showGame();
+
 protected:
     void closeEvent(QCloseEvent *event) override;
 
 private:
     QStackedWidget *stack;
+
     IntroScreen *introScreen;
     CheckDevicesScreen *checkScreen;
     MainMenu *mainMenu;
     GameUI *gameUI;
+    CalibrationScreen *calibrationScreen;
+    ExplanationScreen *explanationScreen;
+
     Robot *robot;
     Camera *camera;
     StateMachine stateMachine;

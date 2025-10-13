@@ -1,157 +1,232 @@
 #include "MainMenu.hpp"
+#include <QPixmap>
 #include <QSpacerItem>
-#include <QFontDatabase>
-#include <QDebug>
 
-MainMenu::MainMenu(QFont *fontButton, QFont *fontTextbox, QWidget *parent)
+MainMenu::MainMenu(QWidget *parent)
     : QWidget(parent)
 {
-    setStyleSheet("background-color: #BEE7FB;");
+    // === FOND BLANC TOTAL ===
+    setAutoFillBackground(true);
+    QPalette pal = palette();
+    pal.setColor(QPalette::Window, Qt::white);
+    setPalette(pal);
 
-    // === Polices ===
-    if (fontButton) buttonFont = *fontButton;
-    else buttonFont = QFont("Arial", 20);
+    // === STACK POUR LES DEUX MENUS ===
+    stack = new QStackedWidget(this);
+    createMainMenu();
+    createDifficultyMenu();
 
-    if (fontTextbox) textboxFont = *fontTextbox;
-    else textboxFont = QFont("Arial", 14);
+    stack->addWidget(mainMenuWidget);
+    stack->addWidget(difficultyWidget);
+    stack->setCurrentWidget(mainMenuWidget);
 
-    // === Bouton Jouer ===
-    playButton = new QPushButton("Jouer");
-    playButton->setFont(buttonFont);
-    playButton->setStyleSheet("background-color: #6895BE; color: white; font-size: 32px; padding: 12px; border-radius: 15px;");
+    // === BOUTON AIDE ===
+    helpButton = new QPushButton("?");
+    helpButton->setFixedSize(70, 70);
+    helpButton->setStyleSheet(
+        "QPushButton {"
+        " background-color: #4A90E2;"
+        " color: white;"
+        " font-size: 32px;"
+        " font-weight: bold;"
+        " border-radius: 35px;"
+        "}"
+        "QPushButton:hover { background-color: #357ABD; }"
+        );
+    helpButton->setCursor(Qt::PointingHandCursor);
+    connect(helpButton, &QPushButton::clicked, this, &MainMenu::openExplanation);
 
-    // === Boutons de difficulté ===
-    easyButton = new QPushButton("Facile");
-    mediumButton = new QPushButton("Moyen");
-    hardButton = new QPushButton("Difficile");
+    // === LOGO POLYTECH TOURS EN BAS CENTRE ===
+    QLabel *logoLabel = new QLabel(this);
+    QPixmap logo("./Ressources/image/Logo_PolytechTours.png");
+    if (!logo.isNull())
+        logoLabel->setPixmap(logo.scaled(180, 180, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    logoLabel->setAlignment(Qt::AlignCenter);
 
-    QList<QPushButton*> diffButtons = {easyButton, mediumButton, hardButton};
-    QList<QString> colors = {"#A0C882", "#F09C42", "#EC776D"};
+    // === LAYOUT GLOBAL ===
+    QVBoxLayout *global = new QVBoxLayout(this);
+    global->setContentsMargins(0, 0, 0, 0);
+    global->setSpacing(0);
+    global->addWidget(stack, 1);
+
+    // Barre du bas : bouton ? à gauche, logo au centre
+    QHBoxLayout *bottomBar = new QHBoxLayout;
+    bottomBar->setContentsMargins(25, 10, 25, 25);
+    bottomBar->addWidget(helpButton, 0, Qt::AlignLeft | Qt::AlignBottom);
+    bottomBar->addStretch();
+    bottomBar->addWidget(logoLabel, 0, Qt::AlignBottom | Qt::AlignCenter);
+    bottomBar->addStretch();
+
+    global->addLayout(bottomBar);
+    setLayout(global);
+}
+
+void MainMenu::createMainMenu()
+{
+    mainMenuWidget = new QWidget(this);
+    QVBoxLayout *layout = new QVBoxLayout(mainMenuWidget);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(20);
+
+    // === TITRE ===
+    titleLabel = new QLabel("PUISSANCE IV");
+    titleLabel->setAlignment(Qt::AlignCenter);
+    titleLabel->setStyleSheet("font-size: 80px; font-weight: bold; color: #1B3B5F;");
+
+    // === BOUTONS ===
+    const int buttonWidth = 380;
+    const int buttonHeight = 80;
+
+    launchButton = new QPushButton("Lancer une partie");
+    calibrationButton = new QPushButton("Calibration");
+    quitButton = new QPushButton("Quitter le jeu");
+
+    QList<QPushButton*> buttons = {launchButton, calibrationButton, quitButton};
+    for (auto *b : buttons) {
+        b->setFixedSize(buttonWidth, buttonHeight);
+        b->setStyleSheet(
+            "QPushButton {"
+            " background-color: #347BB7;"
+            " color: white;"
+            " font-size: 28px;"
+            " font-weight: bold;"
+            " border-radius: 40px;"
+            "}"
+            "QPushButton:hover { background-color: #2A6394; }"
+            );
+        b->setCursor(Qt::PointingHandCursor);
+    }
+
+    // === MISE EN PAGE ===
+    layout->addStretch();
+    layout->addWidget(titleLabel, 0, Qt::AlignCenter);
+    layout->addSpacing(50);
+    for (auto *b : buttons)
+        layout->addWidget(b, 0, Qt::AlignCenter);
+    layout->addStretch();
+
+    connect(launchButton, &QPushButton::clicked, this, &MainMenu::showDifficultyMenu);
+    connect(calibrationButton, &QPushButton::clicked, this, &MainMenu::onCalibration);
+    connect(quitButton, &QPushButton::clicked, this, &MainMenu::onQuit);
+}
+
+void MainMenu::createDifficultyMenu()
+{
+    difficultyWidget = new QWidget(this);
+    QVBoxLayout *layout = new QVBoxLayout(difficultyWidget);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(20);
+
+    // === BOUTON RETOUR ===
+    backButton = new QPushButton("← Retour");
+    backButton->setFixedSize(150, 50);
+    backButton->setStyleSheet(
+        "QPushButton { background-color: #E0E0E0; color: #1B3B5F; font-size: 20px; border-radius: 25px; }"
+        "QPushButton:hover { background-color: #D0D0D0; }"
+        );
+    backButton->setCursor(Qt::PointingHandCursor);
+    connect(backButton, &QPushButton::clicked, this, &MainMenu::showMainMenu);
+
+    // === TITRE ===
+    QLabel *title = new QLabel("Choisissez la difficulté");
+    title->setAlignment(Qt::AlignCenter);
+    title->setStyleSheet("font-size: 60px; font-weight: bold; color: #1B3B5F;");
+
+    // === BOUTONS DE DIFFICULTÉ ===
+    const int buttonWidth = 380;
+    const int buttonHeight = 80;
+
+    diffEasy = new QPushButton("Facile");
+    diffNormal = new QPushButton("Normal");
+    diffHard = new QPushButton("Difficile");
+    diffImpossible = new QPushButton("Impossible");
+
+    QList<QPushButton*> diffButtons = {diffEasy, diffNormal, diffHard, diffImpossible};
+    QList<QString> colors = {"#2ECC71", "#E67E22", "#B22222", "#6B0F1A"};
+
     for (int i = 0; i < diffButtons.size(); ++i) {
-        diffButtons[i]->setFont(buttonFont);
+        diffButtons[i]->setFixedSize(buttonWidth, buttonHeight);
         diffButtons[i]->setStyleSheet(QString(
-                                          "background-color: %1; color: white; font-size: 20px; border-radius: 10px; padding: 6px;"
+                                          "QPushButton { background-color: %1; color: white; font-size: 28px; font-weight: bold; border-radius: 40px; }"
+                                          "QPushButton:hover { background-color: #333333; }"
                                           ).arg(colors[i]));
+        diffButtons[i]->setCursor(Qt::PointingHandCursor);
+        connect(diffButtons[i], &QPushButton::clicked, this, &MainMenu::onDifficultySelected);
     }
 
-    // === Zones de paramètre ===
-    easyParamBox = new QLineEdit("8");
-    mediumParamBox = new QLineEdit("30000");
-    hardParamBox1 = new QLineEdit("1000");
-    hardParamBox2 = new QLineEdit("50");
-    hardParamBox3 = new QLineEdit("2.5");
+    // === LAYOUT ===
+    QHBoxLayout *topBar = new QHBoxLayout;
+    topBar->addWidget(backButton, 0, Qt::AlignLeft);
+    topBar->addStretch();
 
-    QList<QLineEdit*> edits = {easyParamBox, mediumParamBox, hardParamBox1, hardParamBox2, hardParamBox3};
-    for (auto *box : edits) {
-        box->setFont(textboxFont);
-        box->setMaximumWidth(120);
-        box->setAlignment(Qt::AlignCenter);
-    }
-
-    // === Labels de paramètres ===
-    QLabel *easyLabel = new QLabel("profondeur [6 ~ 9] (int)");
-    QLabel *mediumLabel = new QLabel("itérations [100 ~ 100000] (int)");
-    hardLabels[0] = new QLabel("itérations [100 ~ 10000] (int)");
-    hardLabels[1] = new QLabel("simulations [10 ~ 200] (int)");
-    hardLabels[2] = new QLabel("ucb constant [0.9 ~ 4.0] (float)");
-
-    QList<QLabel*> labels = {easyLabel, mediumLabel, hardLabels[0], hardLabels[1], hardLabels[2]};
-    for (auto *lab : labels) {
-        lab->setFont(textboxFont);
-        lab->setStyleSheet("color: #333;");
-    }
-
-    // === Logo Polytech ===
-    logoLabel = new QLabel;
-    QPixmap logo(".\\Ressources\\image\\Logo_PolytechTours.png");
-    if (!logo.isNull()) {
-        logoLabel->setPixmap(logo.scaled(200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    }
-
-    // === Layout des difficultés ===
-    QVBoxLayout *diffLayout = new QVBoxLayout;
-
-    auto addDiffRow = [&](QPushButton *button, QWidget *paramWidget, QWidget *labelWidget) {
-        QHBoxLayout *row = new QHBoxLayout;
-        row->addWidget(button);
-        row->addWidget(paramWidget);
-        row->addWidget(labelWidget);
-        row->addStretch();
-        diffLayout->addLayout(row);
-    };
-
-    addDiffRow(easyButton, easyParamBox, easyLabel);
-    addDiffRow(mediumButton, mediumParamBox, mediumLabel);
-
-    QVBoxLayout *hardParams = new QVBoxLayout;
-    hardParams->addWidget(hardParamBox1);
-    hardParams->addWidget(hardParamBox2);
-    hardParams->addWidget(hardParamBox3);
-    QVBoxLayout *hardLabelsLayout = new QVBoxLayout;
-    hardLabelsLayout->addWidget(hardLabels[0]);
-    hardLabelsLayout->addWidget(hardLabels[1]);
-    hardLabelsLayout->addWidget(hardLabels[2]);
-    QHBoxLayout *hardRow = new QHBoxLayout;
-    hardRow->addWidget(hardButton);
-    hardRow->addLayout(hardParams);
-    hardRow->addLayout(hardLabelsLayout);
-    diffLayout->addLayout(hardRow);
-
-    // === Layout principal ===
-    QVBoxLayout *mainLayout = new QVBoxLayout;
-    mainLayout->addWidget(logoLabel, 0, Qt::AlignRight);
-    mainLayout->addStretch();
-    mainLayout->addWidget(playButton, 0, Qt::AlignCenter);
-    mainLayout->addSpacing(20);
-    mainLayout->addLayout(diffLayout);
-    mainLayout->addStretch();
-    setLayout(mainLayout);
-
-    // === Connexions ===
-    connect(playButton, &QPushButton::clicked, this, &MainMenu::onPlay);
-    connect(easyButton, &QPushButton::clicked, this, &MainMenu::onEasy);
-    connect(mediumButton, &QPushButton::clicked, this, &MainMenu::onMedium);
-    connect(hardButton, &QPushButton::clicked, this, &MainMenu::onHard);
+    layout->addLayout(topBar);
+    layout->addSpacing(20);
+    layout->addWidget(title, 0, Qt::AlignCenter);
+    layout->addSpacing(50);
+    for (auto *b : diffButtons)
+        layout->addWidget(b, 0, Qt::AlignCenter);
+    layout->addStretch();
 }
 
-void MainMenu::resetDifficultyColors()
+void MainMenu::animateTransition(QWidget *from, QWidget *to)
 {
-    easyButton->setStyleSheet("background-color: #A0C882; color: white; border-radius: 10px;");
-    mediumButton->setStyleSheet("background-color: #F09C42; color: white; border-radius: 10px;");
-    hardButton->setStyleSheet("background-color: #EC776D; color: white; border-radius: 10px;");
+    auto *fadeOutEffect = new QGraphicsOpacityEffect(from);
+    from->setGraphicsEffect(fadeOutEffect);
+    auto *fadeOut = new QPropertyAnimation(fadeOutEffect, "opacity");
+    fadeOut->setDuration(300);
+    fadeOut->setStartValue(1.0);
+    fadeOut->setEndValue(0.0);
+
+    auto *fadeInEffect = new QGraphicsOpacityEffect(to);
+    to->setGraphicsEffect(fadeInEffect);
+    fadeInEffect->setOpacity(0.0);
+    auto *fadeIn = new QPropertyAnimation(fadeInEffect, "opacity");
+    fadeIn->setDuration(300);
+    fadeIn->setStartValue(0.0);
+    fadeIn->setEndValue(1.0);
+
+    connect(fadeOut, &QPropertyAnimation::finished, [this, to]() {
+        stack->setCurrentWidget(to);
+    });
+
+    auto *group = new QParallelAnimationGroup(this);
+    group->addAnimation(fadeOut);
+    group->addAnimation(fadeIn);
+    group->start(QAbstractAnimation::DeleteWhenStopped);
 }
 
-void MainMenu::onPlay()
+void MainMenu::showDifficultyMenu() { animateTransition(mainMenuWidget, difficultyWidget); }
+void MainMenu::showMainMenu() { animateTransition(difficultyWidget, mainMenuWidget); }
+
+void MainMenu::onDifficultySelected()
 {
-    emit playClicked();
+    QPushButton *btn = qobject_cast<QPushButton*>(sender());
+    if (!btn) return;
+
+    StateMachine::Difficulty diff = StateMachine::Difficulty::Easy;
+    if (btn == diffImpossible) diff = StateMachine::Difficulty::Impossible;
+    else if (btn == diffHard) diff = StateMachine::Difficulty::Hard;
+    else if (btn == diffNormal) diff = StateMachine::Difficulty::Medium;
+    else if (btn == diffEasy) diff = StateMachine::Difficulty::Easy;
+
+    if (QMessageBox::question(this, "Confirmation",
+                              QString("Démarrer une partie en mode %1 ?").arg(btn->text()),
+                              QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
+        emit startGame(diff);
 }
 
-void MainMenu::onEasy()
+void MainMenu::onCalibration()
 {
-    resetDifficultyColors();
-    easyButton->setStyleSheet("background-color: #89B46F; color: white;");
-    bool ok = false;
-    float p1 = easyParamBox->text().toFloat(&ok);
-    if (ok) emit difficultyChanged(StateMachine::Difficulty::Easy, p1, 0, 0);
+    if (QMessageBox::question(this, "Confirmation",
+                              "Voulez-vous lancer la calibration du robot ?",
+                              QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
+        emit startCalibration();
 }
 
-void MainMenu::onMedium()
+void MainMenu::onQuit()
 {
-    resetDifficultyColors();
-    mediumButton->setStyleSheet("background-color: #D88938; color: white;");
-    bool ok = false;
-    float p1 = mediumParamBox->text().toFloat(&ok);
-    if (ok) emit difficultyChanged(StateMachine::Difficulty::Medium, p1, 0, 0);
-}
-
-void MainMenu::onHard()
-{
-    resetDifficultyColors();
-    hardButton->setStyleSheet("background-color: #C55D53; color: white;");
-    bool ok1, ok2, ok3;
-    float p1 = hardParamBox1->text().toFloat(&ok1);
-    float p2 = hardParamBox2->text().toFloat(&ok2);
-    float p3 = hardParamBox3->text().toFloat(&ok3);
-    if (ok1 && ok2 && ok3)
-        emit difficultyChanged(StateMachine::Difficulty::Hard, p1, p2, p3);
+    if (QMessageBox::question(this, "Quitter le jeu",
+                              "Êtes-vous sûr de vouloir quitter ?",
+                              QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
+        emit quitGame();
 }
