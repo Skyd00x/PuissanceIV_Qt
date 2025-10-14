@@ -15,15 +15,23 @@ int main(int argc, char *argv[])
     MainWindow w;
 
 #if DEBUG_INTRO
+    // === Mode debug ===
+    w.setDebugMode(true);
     qDebug() << "[DEBUG] Lancement direct sur IntroScreen";
     w.showIntro();
 #elif DEBUG_CHECK
+    // === Mode debug ===
+    w.setDebugMode(true);
     qDebug() << "[DEBUG] Lancement direct sur CheckDevicesScreen";
     w.showCheck();
 #elif DEBUG_MENU
+    // === Mode debug ===
+    w.setDebugMode(true);
     qDebug() << "[DEBUG] Lancement direct sur MainMenu";
     w.showMenu();
 #elif DEBUG_GAME
+    // === Mode debug ===
+    w.setDebugMode(true);
     qDebug() << "[DEBUG] Lancement direct sur GameUI";
     w.showGame();
 #else

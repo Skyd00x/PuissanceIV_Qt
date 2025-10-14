@@ -17,6 +17,8 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
+    void setDebugMode(bool enabled);
+
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
@@ -30,6 +32,8 @@ protected:
     void closeEvent(QCloseEvent *event) override;
 
 private:
+    bool debugMode = false;
+
     QStackedWidget *stack;
 
     IntroScreen *introScreen;

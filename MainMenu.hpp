@@ -8,7 +8,6 @@
 #include <QParallelAnimationGroup>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QMessageBox>
 #include "StateMachine.hpp"
 
 class MainMenu : public QWidget
@@ -24,33 +23,49 @@ signals:
     void openExplanation();
     void quitGame();
 
+private:
+    // ⚙️ Définir l'enum AVANT toute fonction qui l'utilise
+    enum class ConfirmationType { None, StartGame, Calibration, Quit };
+    StateMachine::Difficulty selectedDifficulty = StateMachine::Difficulty::Easy;
+    ConfirmationType currentConfirm = ConfirmationType::None;
+
 private slots:
     void showDifficultyMenu();
     void showMainMenu();
     void onDifficultySelected();
-    void onCalibration();
-    void onQuit();
+    void showConfirmationMenu(const QString &text, ConfirmationType type);
 
 private:
-    QStackedWidget *stack; // pour basculer entre les deux vues
+    QStackedWidget *stack;
 
-    // Vue principale
+    // Écrans
     QWidget *mainMenuWidget;
+    QWidget *difficultyWidget;
+    QWidget *confirmWidget;
+
+    // Bouton aide
+    QPushButton *helpButton;
+
+    // Menu principal
     QLabel *titleLabel;
     QPushButton *launchButton;
     QPushButton *calibrationButton;
     QPushButton *quitButton;
-    QPushButton *helpButton;
 
-    // Vue difficultés
-    QWidget *difficultyWidget;
-    QPushButton *backButton;
+    // Difficultés
     QPushButton *diffEasy;
     QPushButton *diffNormal;
     QPushButton *diffHard;
     QPushButton *diffImpossible;
+    QPushButton *backButton;
 
+    // Confirmation
+    QLabel *confirmLabel;
+
+    // Méthodes internes
     void createMainMenu();
     void createDifficultyMenu();
-    void animateTransition(QWidget *from, QWidget *to);
+    void createConfirmationMenu();
+    void animateTransition(QWidget *from, QWidget *to, bool forward);
+
 };

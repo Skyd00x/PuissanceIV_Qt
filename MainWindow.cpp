@@ -38,18 +38,22 @@ MainWindow::MainWindow(QWidget *parent)
 
     // === TRANSITIONS ENTRE SCÈNES ===
     connect(introScreen, &IntroScreen::introFinished, this, [this]() {
+        if (debugMode) return; // Désactive le comportement automatique
         stack->setCurrentWidget(checkScreen);
         checkScreen->startChecking();
     });
 
     connect(checkScreen, &CheckDevicesScreen::readyToContinue, this, [this]() {
+        if (debugMode) return;
         qDebug() << "Connexion au robot et démarrage du flux vidéo...";
 
-        if (robot && !robot->connect())
+        if (robot && !robot->connect()) {
             qWarning() << "Échec de connexion au Dobot.";
+        }
 
-        if (camera)
+        if (camera) {
             camera->start();
+        }
 
         stack->setCurrentWidget(mainMenu);
     });
@@ -115,6 +119,11 @@ MainWindow::~MainWindow()
     delete introScreen;
     delete calibrationScreen;
     delete explanationScreen;
+}
+
+void MainWindow::setDebugMode(bool enabled)
+{
+    debugMode = enabled;
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
