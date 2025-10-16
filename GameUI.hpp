@@ -40,7 +40,12 @@ private slots:
     void onRestartButton();
     void onRefillButton();
 
+    void usePiece();
+    int getRemainingPieces() const { return remainingPieces; }
+
 private:
+    int remainingPieces = 8;
+
     QLabel *cameraLabel;
     QLabel *victoryLabel;
     QLabel *logoPolytech;

@@ -3,42 +3,43 @@
 #include <QDebug>
 
 // === DEBUG FLAGS ===
-// Active un seul à la fois pour ouvrir directement une fenêtre précise
-#define DEBUG_INTRO     0
-#define DEBUG_CHECK     0
-#define DEBUG_MENU      1
-#define DEBUG_GAME      0   // <-- exemple : démarre directement sur le jeu
+#define DEBUG_VISION       0
+#define DEBUG_INTRO        0
+#define DEBUG_CHECK        0
+#define DEBUG_MENU         0
+#define DEBUG_GAME         0
+#define DEBUG_CALIBRATION  1
 
 int main(int argc, char *argv[])
 {
+#if DEBUG_VISION
+    Camera cam;
+    cam.debugVision();
+    return 0;
+#else
     QApplication app(argc, argv);
     MainWindow w;
 
 #if DEBUG_INTRO
-    // === Mode debug ===
     w.setDebugMode(true);
-    qDebug() << "[DEBUG] Lancement direct sur IntroScreen";
     w.showIntro();
 #elif DEBUG_CHECK
-    // === Mode debug ===
     w.setDebugMode(true);
-    qDebug() << "[DEBUG] Lancement direct sur CheckDevicesScreen";
     w.showCheck();
 #elif DEBUG_MENU
-    // === Mode debug ===
     w.setDebugMode(true);
-    qDebug() << "[DEBUG] Lancement direct sur MainMenu";
     w.showMenu();
 #elif DEBUG_GAME
-    // === Mode debug ===
     w.setDebugMode(true);
-    qDebug() << "[DEBUG] Lancement direct sur GameUI";
     w.showGame();
+#elif DEBUG_CALIBRATION
+    w.setDebugMode(true);
+    w.showCalibration();   // <--- nouvelle méthode
 #else
-    qDebug() << "[DEBUG] Mode normal";
     w.showIntro();
 #endif
 
     w.show();
     return app.exec();
+#endif
 }

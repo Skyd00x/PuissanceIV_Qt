@@ -77,8 +77,18 @@ GameUI::~GameUI() {}
 void GameUI::onBackButton() { emit backClicked(); }
 void GameUI::onRestartButton() { emit restartClicked(); victoryLabel->hide(); }
 void GameUI::onRefillButton() {
-    if (robot) robot->Refill();
+    remainingPieces = 8;
+    qDebug() << "Réservoir de pions rechargé (8 disponibles)";
     emit refillClicked();
+}
+
+void GameUI::usePiece() {
+    if (remainingPieces > 0) {
+        remainingPieces--;
+        qDebug() << "Pion utilisé. Restants:" << remainingPieces;
+    } else {
+        qWarning() << "Plus de pions disponibles !";
+    }
 }
 
 void GameUI::updateCameraFrame(const QImage &image) {

@@ -22,7 +22,7 @@ MainWindow::MainWindow(QWidget *parent)
     checkScreen       = new CheckDevicesScreen();
     mainMenu          = new MainMenu();
     gameUI            = new GameUI(robot);
-    calibrationScreen = new CalibrationScreen();
+    calibrationScreen = new CalibrationScreen(robot);
     explanationScreen = new ExplanationScreen();
 
     // === AJOUT DANS LE STACK ===
@@ -154,4 +154,10 @@ void MainWindow::showGame()
 {
     stack->setCurrentWidget(gameUI);
     stateMachine.ChangeState(StateMachine::State::Game);
+}
+
+void MainWindow::showCalibration()
+{
+    stack->setCurrentWidget(calibrationScreen);
+    stateMachine.ChangeState(StateMachine::State::Calibration);
 }

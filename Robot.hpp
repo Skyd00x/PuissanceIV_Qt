@@ -1,34 +1,69 @@
 #pragma once
+#include <QObject>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QFile>
+#include <QDebug>
+#include <array>
+#include "DobotDll.h"
+#include "DobotType.h"
 
-#include "Dobot/DobotDll.h"
-#include "Dobot/DobotType.h"
-#include <iostream>
+// === Données de calibration ===
+struct CalibrationData {
+    Pose gridP1, gridP2;
+    Pose leftP1, leftP2;
+    Pose rightP1, rightP2;
+};
 
-class Robot
+class Robot : public QObject
 {
+    Q_OBJECT
+
 public:
-    Robot();
+    explicit Robot(QObject *parent = nullptr);
     ~Robot();
 
-    bool connect();                // Connexion réelle au Dobot
-    static bool isAvailable();     // ✅ Vérifie simplement si un Dobot est détecté
-
+    // === Connexion ===
+    bool connect();
+    static bool isAvailable();
     void Home();
-    void Play(int column);
-    void Refill();
-    int getRemainingPieces();
 
-private:
-    int remainingPieces = 8;
-    Pose columnCoordinates[7];
-    Pose pieceCoordinates[8];
+    // === Calibration ===
+    void nextCalibrationStep();
+    QString getStepMessage(int step) const;
+    void recordCalibrationStep();
+    void applyCalibration();
+    void saveCalibration(const QString& path = "calibration.json");
+    void loadCalibration(const QString& path = "calibration.json");
+    void resetCalibration();  // ✅ remet currentStep à 1
 
-    void goTo(Pose position);
+    // === Commandes principales ===
+    void goTo(Pose position);              // ✅ toujours "safe"
     void goTo(Pose position, float z);
+    void wait(float seconds);
+
+    // === Commandes pince ===
     void openGripper();
     void closeGripper();
-    void grabPiece();
-    void gripper(bool enable, bool grip);
     void turnOffGripper();
-    void wait(float seconds);
+
+    // === Commande rotation sécurisée ===
+    void rotate(float delta);              // rotation protégée
+
+    // === Accès positions calibrées ===
+    Pose getColumnPose(int index) const;
+    Pose getPiecePose(int index) const;
+
+signals:
+    void calibrationStepChanged(int step, const QString &message);
+    void calibrationFinished(bool success);
+
+private:
+    void gripper(bool enable, bool grip);
+
+    CalibrationData calib;
+    int currentStep = 1;
+
+    std::array<Pose, 7> columnCoordinates;
+    std::array<Pose, 8> pieceCoordinates;
 };

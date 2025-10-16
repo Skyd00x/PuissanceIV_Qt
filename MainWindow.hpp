@@ -27,6 +27,7 @@ public:
     void showCheck();
     void showMenu();
     void showGame();
+    void showCalibration();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
