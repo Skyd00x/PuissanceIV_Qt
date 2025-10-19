@@ -1,28 +1,23 @@
-// CalibrationScreen.hpp
 #pragma once
+
 #include <QWidget>
 #include <QLabel>
-#include <QMovie>
-#include <QPainter>
-#include <QPainterPath>
 #include <QPushButton>
 #include <QProgressBar>
-#include <QTimer>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QStackedLayout>
+#include <QMovie>
 #include <QGraphicsDropShadowEffect>
-#include <QPalette>
-#include <QPixmap>
-#include <QApplication>
-#include <QJsonObject>
-#include <QJsonDocument>
-#include <QFile>
 #include <QPropertyAnimation>
-#include <vector>
+#include <QTimer>
+#include <QPainter>
+#include <QPainterPath>
+#include <QPixmap>
+#include <QGraphicsOpacityEffect>
+
+#include "calibrationLogic.hpp"
 #include "Robot.hpp"
 
-// === STRUCTURE D'ÉTAPE DE CALIBRATION ===
 struct CalibrationStep {
     QString text;
     QString imagePath;
@@ -35,18 +30,28 @@ struct CalibrationStep {
     bool showMenu;
 };
 
-// === CLASSE CALIBRATIONSCREEN ===
 class CalibrationScreen : public QWidget {
     Q_OBJECT
+
 public:
-    explicit CalibrationScreen(Robot *robot, QWidget *parent = nullptr);
+    explicit CalibrationScreen(Robot* robot, QWidget* parent = nullptr);
+
+    void fadeIn();
+    void fadeOut();
 
 signals:
-    void backToMenu();
+    // === Signaux pour la navigation ===
+    void backToMenuRequested();         // Pour revenir au menu principal
+    void calibrationStarted();          // Quand la calibration débute
+    void calibrationFinished();         // Quand elle est terminée
+    void connectionFailed();            // Si la connexion au robot échoue
 
-private slots:
-    void attemptConnection();
-    void onConnectionFinished(bool success);
+    // === Signaux d’état interne ===
+    void stepChanged(int currentStep);  // Émis à chaque changement d’étape
+    void progressUpdated(int value);    // Émis quand la barre progresse
+
+public slots:
+    // === Actions des boutons ===
     void onStartClicked();
     void onNextClicked();
     void onBackClicked();
@@ -55,41 +60,50 @@ private slots:
     void onRotateRightClicked();
     void onTestClicked();
     void onRestartClicked();
+
+    // === Logique interne ===
+    void attemptConnection();
+    void onConnectionFinished(bool success);
+    void onLogicMessage(const QString& msg);
+    void onLogicProgress(int value);
     void onFadeAnimationFinished();
 
 private:
-    void recordCalibrationStep();
-    void resetCalibration();
-    void applyCalibration();
-    void saveCalibration(const QString &path = "./Ressources/calibration.json");
-    void loadCalibration(const QString &path = "./Ressources/calibration.json");
-    void styleButton(QPushButton *button, const QString &c1="#4F8ED8", const QString &c2="#1B3B5F");
+    void styleButton(QPushButton* button, const QString &c1 = "#4F8ED8", const QString &c2 = "#1B3B5F");
+    void applyRoundedImageEffect(QLabel *label, const QString &imagePath);
     void updateStepUI();
-    void fadeOut();
-    void fadeIn();
 
-    // === ATTRIBUTS ===
-    Robot *robot;
-    QTimer *connectionTimer;
-    QLabel *titleLabel;
-    QLabel *label;
-    QLabel *imageLabel;
-    QLabel *loadingLabel;
-    QMovie *loadingMovie;
-    QProgressBar *progressBar;
-    QPushButton *startButton;
-    QPushButton *nextButton;
-    QPushButton *backButton;
-    QPushButton *toggleGripperButton;
-    QPushButton *rotateLeftButton;
-    QPushButton *rotateRightButton;
-    QPushButton *testButton;
-    QPushButton *restartButton;
-    QPushButton *retryButton;
-    QPushButton *menuButton;
-    int currentStep = 0;
+    // === Données ===
+    Robot* robot;
+    CalibrationLogic* logic;
     std::vector<CalibrationStep> steps;
-    QPropertyAnimation *fadeAnimation;
-    QWidget *imageContainer;
-    QWidget *formContainer;
+    int currentStep = -1;
+    bool pendingUpdate;
+
+    // === Éléments UI ===
+    QLabel* titleLabel;
+    QLabel* label;
+    QLabel* imageLabel;
+    QLabel* loadingLabel;
+    QMovie* loadingMovie;
+    QProgressBar* progressBar;
+
+    QWidget* imageContainer;
+    QWidget* formContainer;
+
+    QPushButton* startButton;
+    QPushButton* nextButton;
+    QPushButton* backButton;
+    QPushButton* toggleGripperButton;
+    QPushButton* rotateLeftButton;
+    QPushButton* rotateRightButton;
+    QPushButton* testButton;
+    QPushButton* restartButton;
+    QPushButton* retryButton;
+    QPushButton* menuButton;
+
+    // === Animation & Timer ===
+    QPropertyAnimation* fadeAnimation;
+    QTimer* connectionTimer;
 };
+

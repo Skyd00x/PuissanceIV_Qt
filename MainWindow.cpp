@@ -87,7 +87,7 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     // === RETOURS FUTURS ===
-    connect(calibrationScreen, &CalibrationScreen::backToMenu, this, [this]() {
+    connect(calibrationScreen, &CalibrationScreen::backToMenuRequested, this, [this]() {
         stack->setCurrentWidget(mainMenu);
         stateMachine.ChangeState(StateMachine::State::MainMenu);
     });
