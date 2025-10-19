@@ -1,20 +1,25 @@
 #pragma once
+
 #include <QObject>
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QFile>
+#include <QString>
 #include <QDebug>
+#include <algorithm>
+#include <cmath>
+#include <thread>
+#include <chrono>
 #include <array>
+
+// === SDK Dobot Magician ===
 #include "DobotDll.h"
-#include "DobotType.h"
 
-// === Données de calibration ===
-struct CalibrationData {
-    Pose gridP1, gridP2;
-    Pose leftP1, leftP2;
-    Pose rightP1, rightP2;
-};
-
+// ============================================================================
+//  Classe Robot : Gère le pilotage matériel du Dobot Magician
+//  (connexion, mouvements, pince, rotations, etc.)
+//  → La calibration est désormais gérée dans CalibrationScreen
+// ============================================================================
 class Robot : public QObject
 {
     Q_OBJECT
@@ -23,47 +28,34 @@ public:
     explicit Robot(QObject *parent = nullptr);
     ~Robot();
 
-    // === Connexion ===
+    // === Connexion et disponibilité ===
     bool connect();
-    static bool isAvailable();
+    static bool isAvailable();   // ✅ statique pour utilisation sans instance
+
+    // === Mouvements de base ===
     void Home();
+    bool isMoving() const;
+    void goTo(Pose p);
+    void goTo(Pose p, float z);
+    void rotate(float delta);
 
-    // === Calibration ===
-    void nextCalibrationStep();
-    QString getStepMessage(int step) const;
-    void recordCalibrationStep();
-    void applyCalibration();
-    void saveCalibration(const QString& path = "calibration.json");
-    void loadCalibration(const QString& path = "calibration.json");
-    void resetCalibration();  // ✅ remet currentStep à 1
-
-    // === Commandes principales ===
-    void goTo(Pose position);              // ✅ toujours "safe"
-    void goTo(Pose position, float z);
-    void wait(float seconds);
-
-    // === Commandes pince ===
+    // === Contrôle de la pince ===
     void openGripper();
     void closeGripper();
     void turnOffGripper();
 
-    // === Commande rotation sécurisée ===
-    void rotate(float delta);              // rotation protégée
+    // === Accès aux positions calibrées ===
+    Pose getColumnPose(int i) const;
+    Pose getPiecePose(int i) const;
 
-    // === Accès positions calibrées ===
-    Pose getColumnPose(int index) const;
-    Pose getPiecePose(int index) const;
-
-signals:
-    void calibrationStepChanged(int step, const QString &message);
-    void calibrationFinished(bool success);
+    // === Temporisation ===
+    void wait(float seconds);
 
 private:
+    // === Méthodes internes ===
     void gripper(bool enable, bool grip);
 
-    CalibrationData calib;
-    int currentStep = 1;
-
+    // === Coordonnées calibrées ===
     std::array<Pose, 7> columnCoordinates;
     std::array<Pose, 8> pieceCoordinates;
 };
