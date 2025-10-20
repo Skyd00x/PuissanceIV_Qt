@@ -7,6 +7,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QStackedLayout>
+#include <QTextBrowser>
 #include <QMovie>
 #include <QGraphicsDropShadowEffect>
 #include <QPropertyAnimation>
@@ -18,18 +19,6 @@
 
 #include "calibrationLogic.hpp"
 #include "Robot.hpp"
-
-struct CalibrationStep {
-    QString text;
-    QString imagePath;
-    bool showNext;
-    bool showBack;
-    bool showGripper;
-    bool showRotation;
-    bool showTest;
-    bool showRestart;
-    bool showMenu;
-};
 
 class CalibrationScreen : public QWidget {
     Q_OBJECT
@@ -60,7 +49,7 @@ public slots:
     // === Logique robot ===
     void attemptConnection();
     void onConnectionFinished(bool success);
-    void onRobotReady(); // ✅ quand homing terminé
+    void onRobotReady();
     void onLogicProgress(int value);
     void onFadeAnimationFinished();
 
@@ -74,9 +63,8 @@ private:
     // === Données ===
     Robot* robot;
     CalibrationLogic* logic;
-    std::vector<CalibrationStep> steps;
     int currentStep = -1;
-    bool pendingUpdate;
+    bool pendingUpdate = false;
 
     // === Éléments communs ===
     QLabel* titleLabel;
@@ -98,7 +86,7 @@ private:
     QPushButton* retryButton;
 
     // === Calibration ===
-    QLabel* label;
+    QTextBrowser* instructionsView; // ✅ remplace QLabel
     QLabel* imageLabel;
     QPushButton* nextButton;
     QPushButton* backButton;

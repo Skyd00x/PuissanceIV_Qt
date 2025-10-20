@@ -1,7 +1,4 @@
 #include "CalibrationScreen.hpp"
-#include <thread>
-#include <chrono>
-#include <algorithm>
 
 // === CONSTRUCTEUR ===
 CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
@@ -29,7 +26,7 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         "font-size: 18px; font-weight: bold; text-align: center; }"
         "QProgressBar::chunk { background-color: #4F8ED8; border-radius: 12px; }"
         );
-    progressBar->hide(); // cachée tant que la calibration n’est pas démarrée
+    progressBar->hide();
 
     // === STACK PRINCIPAL ===
     stackedLayout = new QStackedLayout();
@@ -43,15 +40,13 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     introLayout->setSpacing(40);
     introLayout->setContentsMargins(100, 50, 100, 50);
 
-    introLabel = new QLabel(
-        "Connexion au robot en cours...", this);
+    introLabel = new QLabel("Connexion au robot en cours", this);
     introLabel->setAlignment(Qt::AlignCenter);
     introLabel->setWordWrap(true);
     introLabel->setStyleSheet("font-size: 26px; color: #1B3B5F; font-weight: bold;");
     introLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     introLabel->setMinimumWidth(900);
 
-    // GIF de chargement
     loadingLabel = new QLabel(this);
     loadingMovie = new QMovie("./Ressources/image/Gifs/simple_loading.gif");
     loadingLabel->setMovie(loadingMovie);
@@ -60,14 +55,9 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     loadingLabel->setAlignment(Qt::AlignCenter);
     loadingLabel->hide();
 
-    // Boutons
     startButton = new QPushButton("Commencer la calibration");
-    styleButton(startButton);
-    startButton->setFixedSize(300, 60);
-    startButton->hide();
-
     retryButton = new QPushButton("Réessayer la connexion");
-    styleButton(retryButton);
+    startButton->hide();
     retryButton->hide();
 
     introLayout->addWidget(introLabel, 0, Qt::AlignCenter);
@@ -81,20 +71,49 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     // =====================
     calibrationWidget = new QWidget(this);
     QHBoxLayout* contentLayout = new QHBoxLayout(calibrationWidget);
-    contentLayout->setSpacing(30);
+    contentLayout->setSpacing(50);
+    contentLayout->setContentsMargins(40, 20, 40, 20);
+    contentLayout->setAlignment(Qt::AlignVCenter);
 
     imageLabel = new QLabel(this);
     imageLabel->setAlignment(Qt::AlignCenter);
     imageLabel->setFixedSize(500, 500);
     applyRoundedImageEffect(imageLabel, "./Ressources/image/Calibration/welcome_calibration.png");
 
+    auto *shadow = new QGraphicsDropShadowEffect(imageLabel);
+    shadow->setBlurRadius(30);
+    shadow->setOffset(8, 8);
+    shadow->setColor(QColor(0, 0, 0, 100));
+    imageLabel->setGraphicsEffect(shadow);
+
     QWidget* formContainer = new QWidget(this);
+    formContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     QVBoxLayout* formLayout = new QVBoxLayout(formContainer);
-    formLayout->setAlignment(Qt::AlignTop);
-    label = new QLabel("Instructions de calibration...", this);
-    label->setAlignment(Qt::AlignCenter);
-    label->setWordWrap(true);
-    label->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold;");
+    formLayout->setAlignment(Qt::AlignVCenter);
+    formLayout->setContentsMargins(0, 0, 30, 0);
+    formLayout->setSpacing(20);
+
+    instructionsView = new QTextBrowser(this);
+    instructionsView->setOpenLinks(false);
+    instructionsView->setOpenExternalLinks(false);
+    instructionsView->setReadOnly(true);
+    instructionsView->setFrameShape(QFrame::NoFrame);
+    instructionsView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    instructionsView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    instructionsView->setAlignment(Qt::AlignCenter);
+    instructionsView->setStyleSheet(
+        "QTextBrowser {"
+        "  background: transparent;"
+        "  color: #1B3B5F;"
+        "  font-size: 24px;"
+        "  font-weight: bold;"
+        "  padding: 10px;"
+        "  text-align: justify;"
+        "}"
+        );
+    instructionsView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    instructionsView->setMinimumWidth(750);
+    instructionsView->setMaximumHeight(100);
 
     toggleGripperButton = new QPushButton("Ouvrir / Fermer la pince");
     rotateLeftButton = new QPushButton("↺ Tourner gauche");
@@ -102,65 +121,59 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     backButton = new QPushButton("Retour");
     nextButton = new QPushButton("Suivant");
 
-    QList<QPushButton*> calibButtons = {
-        toggleGripperButton, rotateLeftButton, rotateRightButton, backButton, nextButton
-    };
-    for (auto *b : calibButtons) {
-        styleButton(b);
-        b->setFixedSize(200, 50);
-    }
-
     QHBoxLayout* gripLayout = new QHBoxLayout();
-    gripLayout->addStretch();
+    gripLayout->setAlignment(Qt::AlignCenter);
+    gripLayout->setSpacing(10);
     gripLayout->addWidget(toggleGripperButton);
-    gripLayout->addSpacing(10);
     gripLayout->addWidget(rotateLeftButton);
-    gripLayout->addSpacing(10);
     gripLayout->addWidget(rotateRightButton);
-    gripLayout->addStretch();
 
     QHBoxLayout* navLayout = new QHBoxLayout();
-    navLayout->addStretch();
+    navLayout->setAlignment(Qt::AlignCenter);
+    navLayout->setSpacing(20);
     navLayout->addWidget(backButton);
-    navLayout->addSpacing(20);
     navLayout->addWidget(nextButton);
-    navLayout->addStretch();
 
-    formLayout->addWidget(label, 0, Qt::AlignCenter);
-    formLayout->addSpacing(20);
+    formLayout->addWidget(instructionsView, 0, Qt::AlignCenter);
+    formLayout->addSpacing(10);
     formLayout->addLayout(gripLayout);
-    formLayout->addSpacing(30);
+    formLayout->addSpacing(20);
     formLayout->addLayout(navLayout);
 
     contentLayout->addWidget(imageLabel, 3);
     contentLayout->addWidget(formContainer, 7);
     stackedLayout->addWidget(calibrationWidget);
 
-    // === FIN ===
+    // =====================
+    // === FIN (modifiée uniquement dans la structure)
+    // =====================
     endWidget = new QWidget(this);
     QVBoxLayout* endLayout = new QVBoxLayout(endWidget);
     endLayout->setAlignment(Qt::AlignCenter);
-    endLayout->setSpacing(25);
+    endLayout->setSpacing(40);
+    endLayout->setContentsMargins(100, 80, 100, 80);
 
-    endLabel = new QLabel("Calibration terminée !<br>Vous pouvez maintenant tester les positions, recommencer ou revenir au menu principal.", this);
+    endLabel = new QLabel(
+        "Calibration terminée.<br>"
+        "Vous pouvez maintenant tester les positions, recommencer la calibration ou revenir au menu principal.",
+        this
+        );
     endLabel->setAlignment(Qt::AlignCenter);
     endLabel->setWordWrap(true);
-    endLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold;");
+    endLabel->setStyleSheet("font-size: 26px; color: #1B3B5F; font-weight: bold;");
+    endLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    endLabel->setMinimumWidth(900);  // même largeur que l’intro
+
 
     testButton = new QPushButton("Tester toutes les positions");
     restartButton = new QPushButton("Recommencer");
     menuButton = new QPushButton("Retour au menu principal");
 
-    QList<QPushButton*> endButtons = { testButton, restartButton, menuButton };
-    for (auto *b : endButtons) {
-        styleButton(b);
-        b->setFixedSize(250, 55);
-    }
-
-    endLayout->addWidget(endLabel);
-    endLayout->addWidget(testButton);
-    endLayout->addWidget(restartButton);
-    endLayout->addWidget(menuButton);
+    endLayout->addWidget(endLabel, 0, Qt::AlignCenter);
+    endLayout->addSpacing(30);
+    endLayout->addWidget(testButton, 0, Qt::AlignCenter);
+    endLayout->addWidget(restartButton, 0, Qt::AlignCenter);
+    endLayout->addWidget(menuButton, 0, Qt::AlignCenter);
     stackedLayout->addWidget(endWidget);
 
     // === LAYOUT GLOBAL ===
@@ -171,11 +184,59 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     mainLayout->addSpacing(20);
     mainLayout->addLayout(stackedLayout);
 
+    QList<QPushButton*> allButtons = {
+        startButton, retryButton,
+        nextButton, backButton,
+        toggleGripperButton, rotateLeftButton, rotateRightButton,
+        testButton, restartButton, menuButton
+    };
+    for (auto *b : allButtons) {
+        styleButton(b);
+        b->setFixedHeight(55);
+    }
+
     // === LOGIQUE ===
     logic = new CalibrationLogic(robot, this);
     connect(logic, &CalibrationLogic::progressChanged, this, &CalibrationScreen::onLogicProgress);
     connect(logic, &CalibrationLogic::connectionFinished, this, &CalibrationScreen::onConnectionFinished);
     connect(logic, &CalibrationLogic::robotReady, this, &CalibrationScreen::onRobotReady);
+    connect(logic, &CalibrationLogic::stepChanged, this, [this](const CalibrationStep& step, int index) {
+        instructionsView->clear();
+        instructionsView->setHtml(step.text);
+        instructionsView->document()->adjustSize();
+        instructionsView->updateGeometry();
+        instructionsView->document()->setTextWidth(instructionsView->viewport()->width());
+
+        applyRoundedImageEffect(imageLabel, step.imagePath);
+        nextButton->setVisible(step.showNext);
+        backButton->setVisible(step.showBack);
+        toggleGripperButton->setVisible(step.showGripper);
+        rotateLeftButton->setVisible(step.showRotation);
+        rotateRightButton->setVisible(step.showRotation);
+        testButton->setVisible(step.showTest);
+        restartButton->setVisible(step.showRestart);
+        menuButton->setVisible(step.showMenu);
+        currentStep = index;
+    });
+    connect(logic, &CalibrationLogic::calibrationFinished, this, [this]() {
+        showEndLayout();
+    });
+    connect(logic, &CalibrationLogic::calibrationTestFinished, this, [this]() {
+        // 🔹 Cacher le GIF
+        loadingMovie->stop();
+        loadingLabel->hide();
+
+        // 🔹 Remettre le texte d’origine
+        endLabel->setText(
+            "✅ <b>Calibration terminée !</b><br><br>"
+            "Vous pouvez maintenant tester les positions, recommencer ou revenir au menu principal."
+            );
+
+        // 🔹 Réafficher les boutons
+        testButton->show();
+        restartButton->show();
+        menuButton->show();
+    });
 
     // === ANIMATION ===
     fadeAnimation = new QPropertyAnimation(this, "windowOpacity");
@@ -194,12 +255,12 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     connect(menuButton, &QPushButton::clicked, this, [this]() { emit backToMenuRequested(); });
     connect(retryButton, &QPushButton::clicked, this, &CalibrationScreen::attemptConnection);
 
-    // === CONNEXION INITIALE ===
     connectionTimer = new QTimer(this);
     connectionTimer->setSingleShot(true);
     connect(connectionTimer, &QTimer::timeout, this, &CalibrationScreen::attemptConnection);
     connectionTimer->start(300);
 }
+
 
 // === CONNEXION AU ROBOT ===
 void CalibrationScreen::attemptConnection() {
@@ -223,7 +284,7 @@ void CalibrationScreen::onConnectionFinished(bool success) {
         return;
     }
 
-    introLabel->setText("Remise en position initiale du robot...");
+    introLabel->setText("Remise en position initiale du robot");
     startButton->hide();
     retryButton->hide();
     loadingLabel->show();
@@ -256,20 +317,30 @@ void CalibrationScreen::onStartClicked() {
 
 void CalibrationScreen::onNextClicked() {
     logic->recordStep(currentStep);
-    currentStep++;
-    progressBar->setValue(currentStep);
-    if (currentStep >= 7)
-        showEndLayout();
 }
 
 void CalibrationScreen::onBackClicked() {
-    if (currentStep > 0) {
-        currentStep--;
-        progressBar->setValue(currentStep);
-    }
+    logic->previousStep();
 }
 
-void CalibrationScreen::onTestClicked() { logic->testCalibration(); }
+void CalibrationScreen::onTestClicked() {
+    // 🔹 Cacher les boutons pendant le test
+    testButton->hide();
+    restartButton->hide();
+    menuButton->hide();
+
+    // 🔹 Changer le texte
+    endLabel->setText("<b>Test des positions calibrées en cours...</b>");
+
+    // 🔹 Afficher le GIF de chargement
+    loadingLabel->show();
+    loadingMovie->start();
+
+    // 🔹 Lancer le test en thread (non bloquant côté UI)
+    QTimer::singleShot(100, [this]() {
+        logic->testCalibration();
+    });
+}
 
 void CalibrationScreen::onRestartClicked() {
     logic->resetCalibration();
@@ -297,13 +368,30 @@ void CalibrationScreen::showEndLayout() { stackedLayout->setCurrentWidget(endWid
 
 void CalibrationScreen::styleButton(QPushButton *button, const QString &c1, const QString &c2) {
     button->setStyleSheet(QString(
-                              "QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %1, stop:1 %2); color: white;"
-                              "font-size: 16px; font-weight: bold; border: 2px solid #1B3B5F; border-radius: 30px; padding: 8px 16px; }"
-                              "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #66B0FF, stop:1 #347AD1); }"
-                              "QPushButton:pressed { background-color: %2; }"
+                              "QPushButton {"
+                              "   background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %1, stop:1 %2);"
+                              "   color: white;"
+                              "   font-size: 18px;"
+                              "   font-weight: bold;"
+                              "   border: none;"
+                              "   border-radius: 30px;"
+                              "   padding: 10px 20px;"
+                              "   min-width: 220px;"
+                              "   min-height: 55px;"
+                              "   text-align: center;"
+                              "}"
+                              "QPushButton:hover {"
+                              "   background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #66B0FF, stop:1 #347AD1);"
+                              "}"
+                              "QPushButton:pressed {"
+                              "   background-color: %2;"
+                              "}"
                               ).arg(c1, c2));
+
     button->setFont(QFont("Segoe UI", 12, QFont::Bold));
     button->setCursor(Qt::PointingHandCursor);
+
+    // Ombre portée pour effet 3D doux
     auto *shadow = new QGraphicsDropShadowEffect(button);
     shadow->setBlurRadius(20);
     shadow->setOffset(2, 3);
@@ -314,13 +402,23 @@ void CalibrationScreen::styleButton(QPushButton *button, const QString &c1, cons
 void CalibrationScreen::applyRoundedImageEffect(QLabel *label, const QString &imagePath) {
     QPixmap original(imagePath);
     if (original.isNull()) return;
+
+    // Création d’une pixmap avec coins arrondis
     QPixmap rounded(original.size());
     rounded.fill(Qt::transparent);
+
     QPainter painter(&rounded);
-    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setRenderHint(QPainter::Antialiasing, true);
     QPainterPath path;
     path.addRoundedRect(original.rect(), 40, 40);
     painter.setClipPath(path);
     painter.drawPixmap(0, 0, original);
-    label->setPixmap(rounded.scaled(400, 400, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    painter.end();
+
+    // Mise à l’échelle
+    QPixmap scaled = rounded.scaled(400, 400, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+    label->setPixmap(scaled);
+    label->setStyleSheet("background: transparent; border: none;");
 }
+

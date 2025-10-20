@@ -4,7 +4,28 @@
 #include <QMetaObject>
 
 CalibrationLogic::CalibrationLogic(Robot* robot, QObject* parent)
-    : QObject(parent), robot(robot), connected(false), stepIndex(0), gripperOpen(false) {}
+    : QObject(parent), robot(robot), connected(false), stepIndex(0), gripperOpen(false)
+{
+    // === Initialisation des étapes UI ===
+    steps = {
+        { "Videz les réservoirs, sauf un pion dans le réservoir de gauche à l'emplacement 1.",
+         "./Ressources/image/Calibration/Etape1.png", true, false, false, false, false, false, false },
+        { "Attrapez le pion du réservoir de gauche avec la pince du robot (elle doit être fermée).",
+         "./Ressources/image/Calibration/Etape2.png", true, true, true, true, false, false, false },
+        { "Amenez le pion à l'emplacement 4 du réservoir de gauche.",
+         "./Ressources/image/Calibration/Etape3.png", true, true, true, true, false, false, false },
+        { "Amenez le pion à l'emplacement 1 du réservoir de droite.",
+         "./Ressources/image/Calibration/Etape4.png", true, true, true, true, false, false, false },
+        { "Amenez le pion à l'emplacement 4 du réservoir de droite.",
+         "./Ressources/image/Calibration/Etape5.png", true, true, true, true, false, false, false },
+        { "Amenez le pion à la colonne tout à gauche de la grille.",
+         "./Ressources/image/Calibration/Etape6.png", true, true, true, true, false, false, false },
+        { "Amenez le pion à la colonne tout à droite de la grille.",
+         "./Ressources/image/Calibration/Etape7.png", true, true, true, true, false, false, false },
+        { "Calibration terminée.<br>Vous pouvez maintenant tester les positions, recommencer ou quitter.",
+         "./Ressources/image/welcome_calibration.png", false, false, false, false, true, true, true }
+    };
+}
 
 bool CalibrationLogic::connectToRobot() {
     if (!robot) return false;
@@ -42,6 +63,10 @@ void CalibrationLogic::startCalibration() {
     stepIndex = 0;
     calibrationData.clear();
     emit progressChanged(0);
+
+    // 🔹 Envoie la première étape à l’UI
+    if (!steps.empty())
+        emit stepChanged(steps[0], 0);
 }
 
 void CalibrationLogic::recordStep(int index) {
@@ -57,34 +82,90 @@ void CalibrationLogic::recordStep(int index) {
 
     calibrationData[index] = data;
     emit progressChanged(index + 1);
+
+    // 🔹 Étape suivante
+    stepIndex = index + 1;
+    if (stepIndex < static_cast<int>(steps.size()))
+        emit stepChanged(steps[stepIndex], stepIndex);
+
+    // ✅ Si on vient de finir la dernière étape, on signale la fin
+    if (stepIndex >= static_cast<int>(steps.size()) - 1) {
+        emit calibrationFinished();  // on émet un signal
+    }
+}
+
+void CalibrationLogic::previousStep() {
+    if (!connected) return;
+    if (stepIndex <= 0) {
+        stepIndex = 0;
+        // Rester sur la première étape
+        if (!steps.empty())
+            emit stepChanged(steps[0], 0);
+        emit progressChanged(0);
+        return;
+    }
+
+    // Reculer d'une étape
+    stepIndex--;
+
+    // Mettre à jour la progression (barre 0..7)
+    emit progressChanged(stepIndex);
+
+    // Pousser l'étape correspondante à l'UI
+    if (stepIndex < static_cast<int>(steps.size()))
+        emit stepChanged(steps[stepIndex], stepIndex);
 }
 
 void CalibrationLogic::testCalibration() {
     if (!connected || calibrationData.empty()) return;
 
-    int total = static_cast<int>(calibrationData.size());
-    for (int i = 0; i < total; ++i) {
-        robot->goTo(calibrationData[i].pose);
-        emit progressChanged(static_cast<int>((float(i + 1) / total) * 100));
-        std::this_thread::sleep_for(std::chrono::milliseconds(400));
-    }
+    std::thread([this]() {
+        int total = static_cast<int>(calibrationData.size());
+        if (total == 0) return;
+
+        for (int i = 0; i < total; ++i) {
+            // Aller à la position enregistrée
+            robot->goTo(calibrationData[i].pose);
+
+            // Attendre que le robot ait fini de bouger
+            while (robot->isMoving()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+
+            // Mise à jour de la progression (0–100%)
+            int progress = static_cast<int>((float(i + 1) / total) * 100);
+            QMetaObject::invokeMethod(this, [this, progress]() {
+                emit progressChanged(progress);
+            }, Qt::QueuedConnection);
+
+            // Petite pause visuelle entre chaque position
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        }
+
+        // ✅ Fin du test
+        QMetaObject::invokeMethod(this, [this]() {
+            emit calibrationTestFinished();
+        }, Qt::QueuedConnection);
+    }).detach();
 }
 
 void CalibrationLogic::resetCalibration() {
     calibrationData.clear();
     stepIndex = 0;
     emit progressChanged(0);
+
+    // 🔹 Retour à la première étape
+    if (!steps.empty())
+        emit stepChanged(steps[0], 0);
 }
 
 // === Manipulations robot ===
 void CalibrationLogic::toggleGripper() {
     if (!connected || !robot) return;
-
     if (gripperOpen)
         robot->closeGripper();
     else
         robot->openGripper();
-
     gripperOpen = !gripperOpen;
 }
 
