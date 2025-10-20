@@ -6,6 +6,7 @@
 #include <QProgressBar>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QStackedLayout>
 #include <QMovie>
 #include <QGraphicsDropShadowEffect>
 #include <QPropertyAnimation>
@@ -40,38 +41,35 @@ public:
     void fadeOut();
 
 signals:
-    // === Signaux pour la navigation ===
-    void backToMenuRequested();         // Pour revenir au menu principal
-    void calibrationStarted();          // Quand la calibration débute
-    void calibrationFinished();         // Quand elle est terminée
-    void connectionFailed();            // Si la connexion au robot échoue
+    void backToMenuRequested();
+    void calibrationStarted();
+    void calibrationFinished();
+    void connectionFailed();
 
-    // === Signaux d’état interne ===
-    void stepChanged(int currentStep);  // Émis à chaque changement d’étape
-    void progressUpdated(int value);    // Émis quand la barre progresse
+    void stepChanged(int currentStep);
+    void progressUpdated(int value);
 
 public slots:
-    // === Actions des boutons ===
+    // === Boutons ===
     void onStartClicked();
     void onNextClicked();
     void onBackClicked();
-    void onToggleGripperClicked();
-    void onRotateLeftClicked();
-    void onRotateRightClicked();
     void onTestClicked();
     void onRestartClicked();
 
-    // === Logique interne ===
+    // === Logique robot ===
     void attemptConnection();
     void onConnectionFinished(bool success);
-    void onLogicMessage(const QString& msg);
+    void onRobotReady(); // ✅ quand homing terminé
     void onLogicProgress(int value);
     void onFadeAnimationFinished();
 
 private:
     void styleButton(QPushButton* button, const QString &c1 = "#4F8ED8", const QString &c2 = "#1B3B5F");
     void applyRoundedImageEffect(QLabel *label, const QString &imagePath);
-    void updateStepUI();
+    void showIntroLayout();
+    void showCalibrationLayout();
+    void showEndLayout();
 
     // === Données ===
     Robot* robot;
@@ -80,30 +78,37 @@ private:
     int currentStep = -1;
     bool pendingUpdate;
 
-    // === Éléments UI ===
+    // === Éléments communs ===
     QLabel* titleLabel;
-    QLabel* label;
-    QLabel* imageLabel;
+    QProgressBar* progressBar;
+    QPropertyAnimation* fadeAnimation;
+    QTimer* connectionTimer;
+    QStackedLayout* stackedLayout;
+
+    // === Layouts ===
+    QWidget* introWidget;
+    QWidget* calibrationWidget;
+    QWidget* endWidget;
+
+    // === Intro ===
+    QLabel* introLabel;
     QLabel* loadingLabel;
     QMovie* loadingMovie;
-    QProgressBar* progressBar;
-
-    QWidget* imageContainer;
-    QWidget* formContainer;
-
     QPushButton* startButton;
+    QPushButton* retryButton;
+
+    // === Calibration ===
+    QLabel* label;
+    QLabel* imageLabel;
     QPushButton* nextButton;
     QPushButton* backButton;
     QPushButton* toggleGripperButton;
     QPushButton* rotateLeftButton;
     QPushButton* rotateRightButton;
+
+    // === Fin ===
+    QLabel* endLabel;
     QPushButton* testButton;
     QPushButton* restartButton;
-    QPushButton* retryButton;
     QPushButton* menuButton;
-
-    // === Animation & Timer ===
-    QPropertyAnimation* fadeAnimation;
-    QTimer* connectionTimer;
 };
-

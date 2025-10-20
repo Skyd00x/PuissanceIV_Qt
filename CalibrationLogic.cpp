@@ -4,30 +4,27 @@
 #include <QMetaObject>
 
 CalibrationLogic::CalibrationLogic(Robot* robot, QObject* parent)
-    : QObject(parent), robot(robot), connected(false), stepIndex(0) {}
+    : QObject(parent), robot(robot), connected(false), stepIndex(0), gripperOpen(false) {}
 
 bool CalibrationLogic::connectToRobot() {
     if (!robot) return false;
 
-    emit messageUpdated("Connexion au robot en cours...");
     connected = robot->connect();
-
-    if (connected) {
-        emit messageUpdated("Retour en position initiale du robot...");
-        std::thread([this]() {
-            robot->Home();
-            waitForRobotStable();
-            QMetaObject::invokeMethod(this, [this]() {
-                emit connectionFinished(true);
-                emit messageUpdated("Robot prêt. Cliquez sur 'Commencer la calibration'.");
-            }, Qt::QueuedConnection);
-        }).detach();
-    } else {
-        emit connectionFinished(false);
-        emit messageUpdated("Échec de la connexion au robot.");
-    }
-
+    emit connectionFinished(connected);
     return connected;
+}
+
+void CalibrationLogic::homeRobot() {
+    if (!connected || !robot) return;
+
+    std::thread([this]() {
+        robot->Home();
+        waitForRobotStable();
+
+        QMetaObject::invokeMethod(this, [this]() {
+            emit robotReady();
+        }, Qt::QueuedConnection);
+    }).detach();
 }
 
 void CalibrationLogic::waitForRobotStable() {
@@ -45,7 +42,6 @@ void CalibrationLogic::startCalibration() {
     stepIndex = 0;
     calibrationData.clear();
     emit progressChanged(0);
-    emit messageUpdated("Début de la calibration...");
 }
 
 void CalibrationLogic::recordStep(int index) {
@@ -55,8 +51,10 @@ void CalibrationLogic::recordStep(int index) {
     CalibrationStepData data;
     data.name = QString("Step %1").arg(index + 1);
     data.pose = p;
+
     if (index >= static_cast<int>(calibrationData.size()))
         calibrationData.resize(index + 1);
+
     calibrationData[index] = data;
     emit progressChanged(index + 1);
 }
@@ -64,28 +62,45 @@ void CalibrationLogic::recordStep(int index) {
 void CalibrationLogic::testCalibration() {
     if (!connected || calibrationData.empty()) return;
 
-    emit messageUpdated("Test des positions calibrées en cours...");
     int total = static_cast<int>(calibrationData.size());
-
     for (int i = 0; i < total; ++i) {
         robot->goTo(calibrationData[i].pose);
         emit progressChanged(static_cast<int>((float(i + 1) / total) * 100));
         std::this_thread::sleep_for(std::chrono::milliseconds(400));
     }
-    emit messageUpdated("Test terminé !");
 }
 
 void CalibrationLogic::resetCalibration() {
     calibrationData.clear();
     stepIndex = 0;
-    emit messageUpdated("Calibration réinitialisée.");
     emit progressChanged(0);
 }
 
-void CalibrationLogic::saveCalibration(const QString& path)
-{
-    QJsonArray arr;  // maintenant défini
+// === Manipulations robot ===
+void CalibrationLogic::toggleGripper() {
+    if (!connected || !robot) return;
 
+    if (gripperOpen)
+        robot->closeGripper();
+    else
+        robot->openGripper();
+
+    gripperOpen = !gripperOpen;
+}
+
+void CalibrationLogic::rotateLeft() {
+    if (!connected || !robot) return;
+    robot->rotate(+5);
+}
+
+void CalibrationLogic::rotateRight() {
+    if (!connected || !robot) return;
+    robot->rotate(-5);
+}
+
+// === Sauvegarde / Chargement ===
+void CalibrationLogic::saveCalibration(const QString& path) {
+    QJsonArray arr;
     for (const auto& d : calibrationData) {
         QJsonObject o;
         o["name"] = d.name;
@@ -103,33 +118,24 @@ void CalibrationLogic::saveCalibration(const QString& path)
     if (f.open(QIODevice::WriteOnly)) {
         f.write(QJsonDocument(root).toJson());
         f.close();
-        emit messageUpdated("Calibration sauvegardée dans " + path);
-    } else {
-        emit messageUpdated("Erreur : impossible d'écrire le fichier " + path);
     }
 }
 
 void CalibrationLogic::loadCalibration(const QString& path) {
     QFile f(path);
-    if (!f.open(QIODevice::ReadOnly)) {
-        emit messageUpdated("Aucune calibration enregistrée trouvée.");
+    if (!f.open(QIODevice::ReadOnly))
         return;
-    }
 
     QByteArray data = f.readAll();
     f.close();
 
     QJsonDocument doc = QJsonDocument::fromJson(data);
-    if (!doc.isObject()) {
-        emit messageUpdated("Erreur : fichier de calibration invalide.");
+    if (!doc.isObject())
         return;
-    }
 
-    QJsonObject root = doc.object();
-    QJsonArray arr = root["steps"].toArray();  // ✅ ici aussi : QJsonArray
-
+    QJsonArray arr = doc.object()["steps"].toArray();
     calibrationData.clear();
-    for (const QJsonValue& v : arr) {  // ✅ pas besoin d’auto ici
+    for (const QJsonValue& v : arr) {
         QJsonObject o = v.toObject();
         CalibrationStepData d;
         d.name = o["name"].toString();
@@ -139,6 +145,4 @@ void CalibrationLogic::loadCalibration(const QString& path) {
         d.pose.r = o["r"].toDouble();
         calibrationData.push_back(d);
     }
-
-    emit messageUpdated(QString("Calibration chargée (%1 positions)").arg(calibrationData.size()));
 }

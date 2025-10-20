@@ -45,7 +45,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         CheckDevicesScreen.hpp CheckDevicesScreen.cpp
         CalibrationScreen.hpp CalibrationScreen.cpp
         ExplanationScreen.hpp ExplanationScreen.cpp
-        calibrationLogic.hpp calibrationLogic.cpp
+        CalibrationLogic.hpp CalibrationLogic.cpp
     )
     qt_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
 else()
