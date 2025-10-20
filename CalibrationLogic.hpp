@@ -8,13 +8,6 @@
 #include <vector>
 #include "Robot.hpp"
 
-// === Données de calibration (positions enregistrées) ===
-struct CalibrationStepData {
-    QString name;
-    Pose pose;
-};
-
-// === Étapes de procédure (affichage UI) ===
 struct CalibrationStep {
     QString text;
     QString imagePath;
@@ -27,31 +20,28 @@ struct CalibrationStep {
     bool showMenu;
 };
 
-class CalibrationLogic : public QObject
-{
-    Q_OBJECT
+struct CalibrationStepData {
+    QString name;
+    Pose pose;
+};
 
+class CalibrationLogic : public QObject {
+    Q_OBJECT
 public:
     explicit CalibrationLogic(Robot* robot, QObject* parent = nullptr);
 
     bool connectToRobot();
-    void waitForRobotStable();
-
-public slots:
-    // === Commandes principales ===
     void homeRobot();
     void startCalibration();
     void recordStep(int index);
-    void testCalibration();
-    void resetCalibration();
     void previousStep();
+    void resetCalibration();
 
-    // === Commandes de manipulation du robot ===
+    void testCalibration();
     void toggleGripper();
     void rotateLeft();
     void rotateRight();
 
-    // === Sauvegarde / chargement ===
     void saveCalibration(const QString& path);
     void loadCalibration(const QString& path);
 
@@ -64,11 +54,15 @@ signals:
     void calibrationTestFinished();
 
 private:
+    void waitForRobotStable();
+    std::vector<Pose> interpolatePoints(const Pose& start, const Pose& end, int count);
+    void computeAllPositions();  // 🔹 génère tous les points calculés
+
+private:
     Robot* robot;
     bool connected;
     int stepIndex;
-    bool gripperOpen = false;
-
-    std::vector<CalibrationStepData> calibrationData;
+    bool gripperOpen;
     std::vector<CalibrationStep> steps;
+    std::vector<CalibrationStepData> calibrationData;
 };

@@ -2,11 +2,12 @@
 #include <thread>
 #include <chrono>
 #include <QMetaObject>
+#include <cmath>
 
 CalibrationLogic::CalibrationLogic(Robot* robot, QObject* parent)
     : QObject(parent), robot(robot), connected(false), stepIndex(0), gripperOpen(false)
 {
-    // === Initialisation des étapes UI ===
+    // === Définition des étapes UI ===
     steps = {
         { "Videz les réservoirs, sauf un pion dans le réservoir de gauche à l'emplacement 1.",
          "./Ressources/image/Calibration/Etape1.png", true, false, false, false, false, false, false },
@@ -27,9 +28,9 @@ CalibrationLogic::CalibrationLogic(Robot* robot, QObject* parent)
     };
 }
 
+// === Connexion / Initialisation ===
 bool CalibrationLogic::connectToRobot() {
     if (!robot) return false;
-
     connected = robot->connect();
     emit connectionFinished(connected);
     return connected;
@@ -41,10 +42,7 @@ void CalibrationLogic::homeRobot() {
     std::thread([this]() {
         robot->Home();
         waitForRobotStable();
-
-        QMetaObject::invokeMethod(this, [this]() {
-            emit robotReady();
-        }, Qt::QueuedConnection);
+        QMetaObject::invokeMethod(this, [this]() { emit robotReady(); }, Qt::QueuedConnection);
     }).detach();
 }
 
@@ -58,23 +56,25 @@ void CalibrationLogic::waitForRobotStable() {
     }
 }
 
+// === Calibration ===
 void CalibrationLogic::startCalibration() {
     if (!connected) return;
     stepIndex = 0;
     calibrationData.clear();
     emit progressChanged(0);
 
-    // 🔹 Envoie la première étape à l’UI
     if (!steps.empty())
         emit stepChanged(steps[0], 0);
 }
 
 void CalibrationLogic::recordStep(int index) {
     if (!connected || !robot) return;
+
     Pose p;
     GetPose(&p);
+
     CalibrationStepData data;
-    data.name = QString("Step %1").arg(index + 1);
+    data.name = QString("Step_%1").arg(index + 1);
     data.pose = p;
 
     if (index >= static_cast<int>(calibrationData.size()))
@@ -83,39 +83,105 @@ void CalibrationLogic::recordStep(int index) {
     calibrationData[index] = data;
     emit progressChanged(index + 1);
 
-    // 🔹 Étape suivante
+    // 🔹 Si toutes les étapes manuelles sont enregistrées, calculer les autres
+    if (index == 6) { // dernière étape manuelle
+        computeAllPositions();
+        emit calibrationFinished();
+    }
+
+    // Étape suivante (UI)
     stepIndex = index + 1;
     if (stepIndex < static_cast<int>(steps.size()))
         emit stepChanged(steps[stepIndex], stepIndex);
-
-    // ✅ Si on vient de finir la dernière étape, on signale la fin
-    if (stepIndex >= static_cast<int>(steps.size()) - 1) {
-        emit calibrationFinished();  // on émet un signal
-    }
 }
 
 void CalibrationLogic::previousStep() {
     if (!connected) return;
     if (stepIndex <= 0) {
         stepIndex = 0;
-        // Rester sur la première étape
         if (!steps.empty())
             emit stepChanged(steps[0], 0);
         emit progressChanged(0);
         return;
     }
 
-    // Reculer d'une étape
     stepIndex--;
-
-    // Mettre à jour la progression (barre 0..7)
     emit progressChanged(stepIndex);
-
-    // Pousser l'étape correspondante à l'UI
     if (stepIndex < static_cast<int>(steps.size()))
         emit stepChanged(steps[stepIndex], stepIndex);
 }
 
+void CalibrationLogic::resetCalibration() {
+    calibrationData.clear();
+    stepIndex = 0;
+    emit progressChanged(0);
+    if (!steps.empty())
+        emit stepChanged(steps[0], 0);
+}
+
+// === Calculs automatiques ===
+std::vector<Pose> CalibrationLogic::interpolatePoints(const Pose& start, const Pose& end, int count) {
+    std::vector<Pose> points;
+    if (count < 2) return points;
+
+    for (int i = 0; i < count; ++i) {
+        float t = static_cast<float>(i) / (count - 1);
+        Pose p;
+        p.x = start.x + (end.x - start.x) * t;
+        p.y = start.y + (end.y - start.y) * t;
+        p.z = start.z + (end.z - start.z) * t;
+        p.r = start.r + (end.r - start.r) * t;
+        points.push_back(p);
+    }
+    return points;
+}
+
+void CalibrationLogic::computeAllPositions() {
+    if (calibrationData.size() < 7) return;
+
+    // 🔹 Sauvegarder les points de référence avant tout
+    Pose left1 = calibrationData[1].pose;
+    Pose left4 = calibrationData[2].pose;
+    Pose right1 = calibrationData[3].pose;
+    Pose right4 = calibrationData[4].pose;
+    Pose grid1 = calibrationData[5].pose;
+    Pose grid7 = calibrationData[6].pose;
+
+    // 🔹 Effacer et reconstruire proprement la liste complète
+    calibrationData.clear();
+
+    // 1️⃣ Réservoir gauche (2 points → 4)
+    auto leftPoints = interpolatePoints(left1, left4, 4);
+    for (int i = 0; i < 4; ++i) {
+        CalibrationStepData d;
+        d.name = QString("Left_%1").arg(i + 1);
+        d.pose = leftPoints[i];
+        calibrationData.push_back(d);
+    }
+
+    // 2️⃣ Réservoir droit (2 points → 4)
+    auto rightPoints = interpolatePoints(right1, right4, 4);
+    for (int i = 0; i < 4; ++i) {
+        CalibrationStepData d;
+        d.name = QString("Right_%1").arg(i + 1);
+        d.pose = rightPoints[i];
+        calibrationData.push_back(d);
+    }
+
+    // 3️⃣ Grille (2 points → 7)
+    auto gridPoints = interpolatePoints(grid1, grid7, 7);
+    for (int i = 0; i < 7; ++i) {
+        CalibrationStepData d;
+        d.name = QString("Grid_%1").arg(i + 1);
+        d.pose = gridPoints[i];
+        calibrationData.push_back(d);
+    }
+
+    // 🔹 Sauvegarde automatique de la calibration complète
+    saveCalibration("./calibration.json");
+}
+
+// === Test des positions ===
 void CalibrationLogic::testCalibration() {
     if (!connected || calibrationData.empty()) return;
 
@@ -123,43 +189,38 @@ void CalibrationLogic::testCalibration() {
         int total = static_cast<int>(calibrationData.size());
         if (total == 0) return;
 
+        qDebug() << "Nombre total de positions testées:" << total;
+
         for (int i = 0; i < total; ++i) {
-            // Aller à la position enregistrée
             robot->goTo(calibrationData[i].pose);
 
-            // Attendre que le robot ait fini de bouger
             while (robot->isMoving()) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                std::this_thread::sleep_for(std::chrono::milliseconds(150));
             }
 
-            // Mise à jour de la progression (0–100%)
-            int progress = static_cast<int>((float(i + 1) / total) * 100);
+            // 🔹 Calcul précis du pourcentage (float → int)
+            double ratio = double(i + 1) / double(total);
+            int progress = std::clamp(static_cast<int>(ratio * 100.0), 0, 100);
+            qDebug() << "Progression:" << progress;
+
             QMetaObject::invokeMethod(this, [this, progress]() {
                 emit progressChanged(progress);
             }, Qt::QueuedConnection);
 
-            // Petite pause visuelle entre chaque position
-            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+            std::this_thread::sleep_for(std::chrono::milliseconds(150));
         }
 
-        // ✅ Fin du test
+
+        // Fin du test
         QMetaObject::invokeMethod(this, [this]() {
             emit calibrationTestFinished();
+            emit progressChanged(100);
         }, Qt::QueuedConnection);
     }).detach();
 }
 
-void CalibrationLogic::resetCalibration() {
-    calibrationData.clear();
-    stepIndex = 0;
-    emit progressChanged(0);
 
-    // 🔹 Retour à la première étape
-    if (!steps.empty())
-        emit stepChanged(steps[0], 0);
-}
-
-// === Manipulations robot ===
+// === Manipulations manuelles ===
 void CalibrationLogic::toggleGripper() {
     if (!connected || !robot) return;
     if (gripperOpen)

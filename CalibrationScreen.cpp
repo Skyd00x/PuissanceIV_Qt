@@ -225,11 +225,13 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         // 🔹 Cacher le GIF
         loadingMovie->stop();
         loadingLabel->hide();
+        progressBar->setRange(0, 7);
+        progressBar->setValue(7);
 
         // 🔹 Remettre le texte d’origine
         endLabel->setText(
-            "✅ <b>Calibration terminée !</b><br><br>"
-            "Vous pouvez maintenant tester les positions, recommencer ou revenir au menu principal."
+            "Calibration terminée.<br>"
+            "Vous pouvez maintenant tester les positions, recommencer la calibration ou revenir au menu principal."
             );
 
         // 🔹 Réafficher les boutons
@@ -328,33 +330,38 @@ void CalibrationScreen::onTestClicked() {
     testButton->hide();
     restartButton->hide();
     menuButton->hide();
+    progressBar->setRange(0, 100); // pourcentage de progression du test
+    progressBar->setValue(0);
 
-    // 🔹 Changer le texte
     endLabel->setText("<b>Test des positions calibrées en cours...</b>");
-
-    // 🔹 Afficher le GIF de chargement
     loadingLabel->show();
     loadingMovie->start();
 
-    // 🔹 Lancer le test en thread (non bloquant côté UI)
     QTimer::singleShot(100, [this]() {
         logic->testCalibration();
     });
 }
 
 void CalibrationScreen::onRestartClicked() {
+    // 🔹 Réinitialiser la logique
     logic->resetCalibration();
     currentStep = 0;
 
+    // 🔹 Afficher le message de reset et le GIF immédiatement
+    introLabel->setText("<b>Remise en position initiale du robot...</b>");
     showIntroLayout();
-    progressBar->hide();
     startButton->hide();
+    progressBar->hide();
 
-    introLabel->setText("Reconnexion au robot en cours...");
     loadingLabel->show();
     loadingMovie->start();
-    attemptConnection();
+
+    // 🔹 Lancer la remise à zéro du robot après un petit délai
+    QTimer::singleShot(200, [this]() {
+        logic->homeRobot();
+    });
 }
+
 
 // === OUTILS ===
 void CalibrationScreen::fadeOut() { fadeAnimation->setStartValue(1.0); fadeAnimation->setEndValue(0.0); fadeAnimation->start(); }
