@@ -254,7 +254,32 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     connect(rotateRightButton, &QPushButton::clicked, logic, &CalibrationLogic::rotateRight);
     connect(testButton, &QPushButton::clicked, this, &CalibrationScreen::onTestClicked);
     connect(restartButton, &QPushButton::clicked, this, &CalibrationScreen::onRestartClicked);
-    connect(menuButton, &QPushButton::clicked, this, [this]() { emit backToMenuRequested(); });
+    connect(menuButton, &QPushButton::clicked, this, [this]() {
+        // 🔹 Réinitialiser la logique
+        logic->resetCalibration();
+        currentStep = 0;
+
+        // 🔹 Réinitialiser l'affichage
+        progressBar->setRange(0, 7);
+        progressBar->setValue(0);
+        progressBar->hide();
+
+        loadingMovie->stop();
+        loadingLabel->hide();
+
+        introLabel->setText("Connexion au robot en cours...");
+        startButton->hide();
+        retryButton->hide();
+
+        // 🔹 Revenir à l’écran d’intro propre
+        showIntroLayout();
+
+        // 🔹 Relancer automatiquement la tentative de connexion
+        connectionTimer->start(300);  // ✅ relance du timer initial (appelera attemptConnection)
+
+        // 🔹 Signaler au reste du programme qu’on retourne au menu
+        emit backToMenuRequested();
+    });
     connect(retryButton, &QPushButton::clicked, this, &CalibrationScreen::attemptConnection);
 
     connectionTimer = new QTimer(this);

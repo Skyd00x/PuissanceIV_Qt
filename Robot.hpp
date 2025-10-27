@@ -18,7 +18,6 @@
 // ============================================================================
 //  Classe Robot : Gère le pilotage matériel du Dobot Magician
 //  (connexion, mouvements, pince, rotations, etc.)
-//  → La calibration est désormais gérée dans CalibrationScreen
 // ============================================================================
 class Robot : public QObject
 {
@@ -30,7 +29,7 @@ public:
 
     // === Connexion et disponibilité ===
     bool connect();
-    static bool isAvailable();   // ✅ statique pour utilisation sans instance
+    static bool isAvailable();
 
     // === Mouvements de base ===
     void Home();

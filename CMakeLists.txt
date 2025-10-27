@@ -1,22 +1,26 @@
 cmake_minimum_required(VERSION 3.16)
-
 project(PuissanceIV_QT VERSION 0.1 LANGUAGES CXX)
 
-# === Paramètres généraux ===
+# ============================================================
+# === PARAMÈTRES GÉNÉRAUX
+# ============================================================
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# === Qt ===
+# ============================================================
+# === Qt
+# ============================================================
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools)
 
 set(TS_FILES PuissanceIV_QT_fr_FR.ts)
 
-# === Fichiers sources du projet ===
+# ============================================================
+# === SOURCES DU PROJET
+# ============================================================
 set(PROJECT_SOURCES
     main.cpp
     MainWindow.cpp MainWindow.hpp MainWindow.ui
@@ -25,27 +29,32 @@ set(PROJECT_SOURCES
     Board.cpp Board.hpp
     BoardDetector.cpp BoardDetector.hpp
     Camera.cpp Camera.hpp
+    CameraAi.cpp CameraAi.hpp
     Robot.cpp Robot.hpp
     StateMachine.cpp StateMachine.hpp
     Negamax.cpp Negamax.hpp
     MonteCarlo.cpp MonteCarlo.hpp
     MCTS.cpp MCTS.hpp
     TranspositionTable.cpp TranspositionTable.hpp
+    IntroScreen.cpp IntroScreen.hpp
+    CheckDevicesScreen.cpp CheckDevicesScreen.hpp
+    CalibrationScreen.cpp CalibrationScreen.hpp
+    ExplanationScreen.cpp ExplanationScreen.hpp
+    CalibrationLogic.cpp CalibrationLogic.hpp
     ${TS_FILES}
 )
 
+# Copie des ressources nécessaires
 file(COPY ${CMAKE_SOURCE_DIR}/Ressources DESTINATION ${CMAKE_BINARY_DIR})
+file(COPY ${CMAKE_SOURCE_DIR}/Model DESTINATION ${CMAKE_BINARY_DIR})
 
-# === Création de l'exécutable Qt ===
+# ============================================================
+# === EXÉCUTABLE
+# ============================================================
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(PuissanceIV_QT
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
-        IntroScreen.hpp IntroScreen.cpp
-        CheckDevicesScreen.hpp CheckDevicesScreen.cpp
-        CalibrationScreen.hpp CalibrationScreen.cpp
-        ExplanationScreen.hpp ExplanationScreen.cpp
-        CalibrationLogic.hpp CalibrationLogic.cpp
     )
     qt_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
 else()
@@ -54,17 +63,15 @@ else()
 endif()
 
 # ============================================================
-# === OpenCV (local dans le projet) ===
+# === OpenCV
 # ============================================================
 set(OpenCV_DIR "${CMAKE_SOURCE_DIR}/opencv")
 include_directories("${OpenCV_DIR}/include")
 link_directories("${OpenCV_DIR}/x64/vc16/lib")
 
-# Récupère toutes les bibliothèques OpenCV .lib (Release & Debug)
 file(GLOB OPENCV_LIBS "${OpenCV_DIR}/x64/vc16/lib/*.lib")
 message(STATUS "✅ OpenCV libs trouvées : ${OPENCV_LIBS}")
 
-# Copie automatique de toutes les DLL OpenCV présentes
 file(GLOB OPENCV_DLLS "${OpenCV_DIR}/x64/vc16/bin/opencv_world*.dll")
 if (OPENCV_DLLS)
     add_custom_command(TARGET PuissanceIV_QT POST_BUILD
@@ -77,7 +84,7 @@ else()
 endif()
 
 # ============================================================
-# === Dobot SDK (local) ===
+# === Dobot SDK
 # ============================================================
 set(DOBOT_DIR "${CMAKE_SOURCE_DIR}/Dobot")
 include_directories("${DOBOT_DIR}")
@@ -87,7 +94,6 @@ if(NOT EXISTS "${DOBOT_DIR}/DobotDll.lib")
     message(FATAL_ERROR "❌ Fichier DobotDll.lib introuvable dans ${DOBOT_DIR}")
 endif()
 
-# Copie automatique de la DLL Dobot après build
 add_custom_command(TARGET PuissanceIV_QT POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${DOBOT_DIR}/DobotDll.dll"
@@ -95,20 +101,43 @@ add_custom_command(TARGET PuissanceIV_QT POST_BUILD
 )
 
 # ============================================================
-# === Liaisons des librairies ===
+# === ONNX Runtime
+# ============================================================
+set(ONNXRUNTIME_DIR "${CMAKE_SOURCE_DIR}/onnxruntime")
+
+include_directories(${ONNXRUNTIME_DIR}/include)
+link_directories(${ONNXRUNTIME_DIR}/lib)
+
+# Vérifie l’existence du fichier .lib
+if(NOT EXISTS "${ONNXRUNTIME_DIR}/lib/onnxruntime.lib")
+    message(FATAL_ERROR "❌ onnxruntime.lib introuvable dans ${ONNXRUNTIME_DIR}/lib — vérifie ton SDK.")
+endif()
+
+# Copie la DLL après compilation
+add_custom_command(TARGET PuissanceIV_QT POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${ONNXRUNTIME_DIR}/lib/onnxruntime.dll"
+        $<TARGET_FILE_DIR:PuissanceIV_QT>
+)
+
+message(STATUS "✅ ONNX Runtime configuré depuis : ${ONNXRUNTIME_DIR}")
+
+# ============================================================
+# === LIENS DES LIBRAIRIES
 # ============================================================
 target_link_libraries(PuissanceIV_QT
     PRIVATE
         Qt${QT_VERSION_MAJOR}::Widgets
         ${OPENCV_LIBS}
         "${DOBOT_DIR}/DobotDll.lib"
+        "${ONNXRUNTIME_DIR}/lib/onnxruntime.lib"
 )
 
 # ============================================================
-# === Propriétés de l'exécutable ===
+# === PROPRIÉTÉS DE L’EXÉCUTABLE
 # ============================================================
 if(${QT_VERSION} VERSION_LESS 6.1.0)
-  set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.PuissanceIV_QT)
+    set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.PuissanceIV_QT)
 endif()
 
 set_target_properties(PuissanceIV_QT PROPERTIES
@@ -120,7 +149,7 @@ set_target_properties(PuissanceIV_QT PROPERTIES
 )
 
 # ============================================================
-# === Installation (facultatif) ===
+# === INSTALLATION (facultatif)
 # ============================================================
 include(GNUInstallDirs)
 install(TARGETS PuissanceIV_QT

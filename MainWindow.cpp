@@ -1,6 +1,4 @@
 #include "MainWindow.hpp"
-#include <QDebug>
-#include <QCloseEvent>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -14,8 +12,9 @@ MainWindow::MainWindow(QWidget *parent)
     setCentralWidget(stack);
 
     // === OBJETS MOTEUR ===
-    robot  = new Robot();
-    camera = new Camera();
+    robot     = new Robot();
+    camera    = new Camera();
+    cameraAI  = new CameraAI(this);   // Ajout IA
 
     // === ÉCRANS ===
     introScreen       = new IntroScreen();
@@ -36,9 +35,9 @@ MainWindow::MainWindow(QWidget *parent)
     // === DÉMARRAGE ===
     stack->setCurrentWidget(introScreen);
 
-    // === TRANSITIONS ENTRE SCÈNES ===
+    // === TRANSITIONS ===
     connect(introScreen, &IntroScreen::introFinished, this, [this]() {
-        if (debugMode) return; // Désactive le comportement automatique
+        if (debugMode) return;
         stack->setCurrentWidget(checkScreen);
         checkScreen->startChecking();
     });
@@ -51,20 +50,25 @@ MainWindow::MainWindow(QWidget *parent)
             qWarning() << "Échec de connexion au Dobot.";
         }
 
+        // === Activation caméra classique ===
         if (camera) {
             camera->start();
+        }
+
+        // === Activation caméra IA ===
+        if (cameraAI) {
+            cameraAI->start(0);
         }
 
         stack->setCurrentWidget(mainMenu);
     });
 
     // === MENU PRINCIPAL ===
-    connect(mainMenu, &MainMenu::startGame, this,
-            [this](StateMachine::Difficulty diff) {
-                stateMachine.setDifficulty(diff);
-                stack->setCurrentWidget(gameUI);
-                stateMachine.ChangeState(StateMachine::State::Game);
-            });
+    connect(mainMenu, &MainMenu::startGame, this, [this](StateMachine::Difficulty diff) {
+        stateMachine.setDifficulty(diff);
+        stack->setCurrentWidget(gameUI);
+        stateMachine.ChangeState(StateMachine::State::Game);
+    });
 
     connect(mainMenu, &MainMenu::startCalibration, this, [this]() {
         stack->setCurrentWidget(calibrationScreen);
@@ -80,13 +84,12 @@ MainWindow::MainWindow(QWidget *parent)
         close();
     });
 
-    // === RETOUR DEPUIS LE JEU ===
+    // === RETOURS ===
     connect(gameUI, &GameUI::backClicked, this, [this]() {
         stack->setCurrentWidget(mainMenu);
         stateMachine.ChangeState(StateMachine::State::MainMenu);
     });
 
-    // === RETOURS FUTURS ===
     connect(calibrationScreen, &CalibrationScreen::backToMenuRequested, this, [this]() {
         stack->setCurrentWidget(mainMenu);
         stateMachine.ChangeState(StateMachine::State::MainMenu);
@@ -97,8 +100,9 @@ MainWindow::MainWindow(QWidget *parent)
         stateMachine.ChangeState(StateMachine::State::MainMenu);
     });
 
-    // === CAMERA ===
-    connect(camera, &Camera::frameReady, gameUI, &GameUI::updateCameraFrame);
+    // === CAMÉRAS ===
+    connect(camera,   &Camera::frameReady,   gameUI, &GameUI::updateCameraFrame);
+    connect(cameraAI, &CameraAI::frameReady, gameUI, &GameUI::updateCameraFrame);
 
     // === LANCEMENT INTRO ===
     introScreen->start();
@@ -109,6 +113,11 @@ MainWindow::~MainWindow()
     if (camera) {
         camera->stop();
         delete camera;
+    }
+
+    if (cameraAI) {
+        cameraAI->stop();
+        delete cameraAI;
     }
 
     if (robot) delete robot;
@@ -130,6 +139,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 {
     qDebug() << "Fermeture de l’application - arrêt des périphériques";
     if (camera) camera->stop();
+    if (cameraAI) cameraAI->stop();
     QMainWindow::closeEvent(event);
 }
 
