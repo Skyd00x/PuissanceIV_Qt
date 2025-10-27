@@ -99,29 +99,6 @@ add_custom_command(TARGET PuissanceIV_QT POST_BUILD
         "${DOBOT_DIR}/DobotDll.dll"
         $<TARGET_FILE_DIR:PuissanceIV_QT>
 )
-
-# ============================================================
-# === ONNX Runtime
-# ============================================================
-set(ONNXRUNTIME_DIR "${CMAKE_SOURCE_DIR}/onnxruntime")
-
-include_directories(${ONNXRUNTIME_DIR}/include)
-link_directories(${ONNXRUNTIME_DIR}/lib)
-
-# Vérifie l’existence du fichier .lib
-if(NOT EXISTS "${ONNXRUNTIME_DIR}/lib/onnxruntime.lib")
-    message(FATAL_ERROR "❌ onnxruntime.lib introuvable dans ${ONNXRUNTIME_DIR}/lib — vérifie ton SDK.")
-endif()
-
-# Copie la DLL après compilation
-add_custom_command(TARGET PuissanceIV_QT POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${ONNXRUNTIME_DIR}/lib/onnxruntime.dll"
-        $<TARGET_FILE_DIR:PuissanceIV_QT>
-)
-
-message(STATUS "✅ ONNX Runtime configuré depuis : ${ONNXRUNTIME_DIR}")
-
 # ============================================================
 # === LIENS DES LIBRAIRIES
 # ============================================================
