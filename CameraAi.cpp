@@ -13,11 +13,11 @@ CameraAI::CameraAI(QObject* parent)
     moveToThread(&workerThread);
 
     QString modelPath = QCoreApplication::applicationDirPath() + "/Model/best.torchscript";
-    qDebug() << "[AI] Chemin absolu du modèle :" << modelPath;
+    qDebug() << "[AI] Chargement du modèle :" << modelPath;
 
     std::filesystem::path fsPath = modelPath.toStdWString();
     if (!std::filesystem::exists(fsPath)) {
-        qWarning() << "[AI] ⚠️ Fichier modèle introuvable:" << modelPath;
+        qWarning() << "[AI] ⚠️ Modèle introuvable:" << modelPath;
         return;
     }
 
@@ -26,7 +26,7 @@ CameraAI::CameraAI(QObject* parent)
         model->eval();
         qDebug() << "[AI] ✅ Modèle YOLOv8 TorchScript chargé (CPU)";
     } catch (const c10::Error& e) {
-        qWarning() << "[AI] ❌ Erreur lors du chargement du modèle:" << e.what();
+        qWarning() << "[AI] ❌ Erreur de chargement:" << e.what();
     }
 }
 
@@ -39,10 +39,9 @@ void CameraAI::start(int camIndex) {
         qWarning() << "[AI] ❌ Impossible d'ouvrir la caméra (index:" << camIndex << ")";
         return;
     }
-
     running = true;
     workerThread.start();
-    qDebug() << "[AI] 🚀 Capture démarrée (thread LibTorch)";
+    qDebug() << "[AI] 🚀 Capture démarrée";
 }
 
 void CameraAI::stop() {
@@ -52,7 +51,7 @@ void CameraAI::stop() {
         workerThread.wait();
     }
     if (cap.isOpened()) cap.release();
-    qDebug() << "[AI] 🛑 Capture arrêtée proprement";
+    qDebug() << "[AI] 🛑 Capture arrêtée";
 }
 
 void CameraAI::processLoop() {
@@ -62,153 +61,150 @@ void CameraAI::processLoop() {
             cap >> frame;
             if (frame.empty()) continue;
 
-            auto detections = inferTorch(frame);
-
-            for (const auto& det : detections) {
-                cv::rectangle(frame,
-                              cv::Point(det.x1, det.y1),
-                              cv::Point(det.x2, det.y2),
-                              cv::Scalar(0, 255, 0), 2);
-            }
-
-            emit frameReady(matToQImage(frame));
+            auto dets = inferTorch(frame);
+            QImage img = matToQImage(frame);
+            emit frameReady(img);
             QThread::msleep(30);
         }
-    } catch (const c10::Error& e) {
-        qWarning() << "[AI] ❌ Exception C10:" << e.what();
     } catch (const std::exception& e) {
-        qWarning() << "[AI] ❌ Exception C++:" << e.what();
-    } catch (...) {
-        qWarning() << "[AI] ❌ Erreur inconnue dans processLoop";
+        qWarning() << "[AI] ❌ Exception:" << e.what();
     }
 }
 
-std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frame) {
+std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR) {
     std::vector<Detection> results;
+    if (!model || frameBGR.empty()) return results;
 
-    if (!model) {
-        qWarning() << "[AI] ⚠️ Modèle non chargé — inférence ignorée";
+    // --- 1) LetterBox
+    const int imgsz = 640;
+    const cv::Scalar padColor(114,114,114);
+    int h0 = frameBGR.rows, w0 = frameBGR.cols;
+    float gain = std::min((float)imgsz / h0, (float)imgsz / w0);
+    int newW  = (int)std::round(w0 * gain);
+    int newH  = (int)std::round(h0 * gain);
+    int padW  = imgsz - newW;
+    int padH  = imgsz - newH;
+    int dw = padW / 2, dh = padH / 2;
+
+    cv::Mat resized, lb(imgsz, imgsz, CV_8UC3, padColor);
+    cv::resize(frameBGR, resized, cv::Size(newW, newH), 0, 0, cv::INTER_LINEAR);
+    resized.copyTo(lb(cv::Rect(dw, dh, newW, newH)));
+
+    // --- 2) RGB + normalize
+    cv::cvtColor(lb, lb, cv::COLOR_BGR2RGB);
+    lb.convertTo(lb, CV_32F, 1.0/255.0);
+    at::Tensor input = torch::from_blob(lb.data, {1, imgsz, imgsz, 3}, at::kFloat)
+                           .permute({0,3,1,2}).contiguous();
+
+    // Debug input size
+    //qDebug() << "[AI] Input tensor size:" << QString::fromStdString(at::toString(input.sizes()));
+
+    // --- 3) Inference
+    torch::NoGradGuard noGrad;
+    at::Tensor out;
+    try {
+        out = model->forward({input}).toTensor();
+    } catch (const c10::Error& e) {
+        qWarning() << "[AI] ❌ Erreur inférence:" << e.what();
         return results;
     }
+    //qDebug() << "[AI] Sortie modèle:" << QString::fromStdString(at::toString(out.sizes()));
 
-    // Prétraitement identique YOLO
-    cv::Mat img;
-    cv::cvtColor(frame, img, cv::COLOR_BGR2RGB);
-    cv::resize(img, img, cv::Size(640, 640));
-    img.convertTo(img, CV_32F, 1.0 / 255.0);
-    torch::Tensor inputTensor = torch::from_blob(img.data, {1, img.rows, img.cols, 3}, torch::kFloat32)
-                                    .permute({0, 3, 1, 2})
-                                    .to(torch::kCPU);
+    // --- 4) Process output
+    out = out.squeeze(0).permute({1,0});            // [N, 4+nc]
+    int64_t nc = out.size(1) - 4;
+    at::Tensor boxes_xywh = out.slice(1, 0, 4);
+    at::Tensor cls_scores = out.slice(1, 4, 4 + nc);
 
-    torch::NoGradGuard noGrad;
+    // --- 5) Confiance & filtre
+    at::Tensor conf, labels;
+    std::tie(conf, labels) = cls_scores.max(1);
+    const float confTh = 0.25f;
+    at::Tensor keep = conf > confTh;
+    boxes_xywh = boxes_xywh.index({keep});
+    conf       = conf.index({keep});
+    labels     = labels.index({keep});
 
-    try {
-        // === Inférence brute ===
-        auto out = model->forward({inputTensor}).toTensor(); // [1, 7, 8400]
-        out = out.squeeze(0).permute({1, 0});                // [8400, 7]
+    // --- 6) Convert xywh -> xyxy
+    auto x = boxes_xywh.select(1,0), y = boxes_xywh.select(1,1);
+    auto w = boxes_xywh.select(1,2), h = boxes_xywh.select(1,3);
+    at::Tensor xyxy = at::stack({x - w*0.5, y - h*0.5, x + w*0.5, y + h*0.5}, 1);
 
-        // Convertir xywh -> xyxy
-        auto xywh = out.slice(1, 0, 4);
-        auto conf = out.select(1, 4).unsqueeze(1);
-        auto cls = out.slice(1, 5); // [8400, 3]
+    // --- 7) NMS par classe
+    const float iouTh = 0.45f;
+    std::vector<cv::Rect> finalBoxes;
+    std::vector<float> finalScores;
+    std::vector<int>   finalClasses;
 
-        // conf * cls (comme Ultralytics)
-        auto scores = cls * conf;
+    auto xyxy_cpu = xyxy.to(torch::kCPU);
+    auto conf_cpu = conf.to(torch::kCPU);
+    auto lab_cpu  = labels.to(torch::kCPU);
 
-        // Trouver meilleure classe
-        auto max_scores = std::get<0>(scores.max(1));
-        auto max_classes = std::get<1>(scores.max(1));
+    for (int c = 0; c < nc; ++c) {
+        std::vector<cv::Rect> boxesC;
+        std::vector<float>    scoresC;
+        std::vector<int>      idxC;
 
-        // Seuillage confiance (identique YOLO Python)
-        float conf_thresh = 0.25f;
-        auto mask = max_scores > conf_thresh;
-        auto inds = mask.nonzero().squeeze();
-        if (inds.numel() == 0) return results;
-
-        auto boxes = xywh.index_select(0, inds);
-        auto scores_sel = max_scores.index_select(0, inds);
-        auto classes_sel = max_classes.index_select(0, inds);
-
-        // xywh → xyxy
-        auto x = boxes.select(1, 0);
-        auto y = boxes.select(1, 1);
-        auto w = boxes.select(1, 2);
-        auto h = boxes.select(1, 3);
-        auto x1 = x - w / 2;
-        auto y1 = y - h / 2;
-        auto x2 = x + w / 2;
-        auto y2 = y + h / 2;
-        auto xyxy = torch::stack({x1, y1, x2, y2}, 1);
-
-        // === NMS simple (IoU 0.45)
-        const float iou_thresh = 0.45f;
-        std::vector<int> keep;
-        auto idxs = std::get<1>(scores_sel.sort(0, true)).to(torch::kCPU);
-        auto boxes_cpu = xyxy.to(torch::kCPU);
-        auto scores_cpu = scores_sel.to(torch::kCPU);
-
-        while (idxs.numel() > 0) {
-            int i = idxs[0].item<int>();
-            keep.push_back(i);
-            if (idxs.numel() == 1) break;
-
-            torch::Tensor rest = idxs.slice(0, 1);
-            auto b1 = boxes_cpu[i];
-            auto area1 = (b1[2] - b1[0]) * (b1[3] - b1[1]);
-            auto b2 = boxes_cpu.index_select(0, rest);
-            auto xx1 = torch::max(b1[0], b2.select(1, 0));
-            auto yy1 = torch::max(b1[1], b2.select(1, 1));
-            auto xx2 = torch::min(b1[2], b2.select(1, 2));
-            auto yy2 = torch::min(b1[3], b2.select(1, 3));
-            auto w_int = torch::clamp(xx2 - xx1, 0);
-            auto h_int = torch::clamp(yy2 - yy1, 0);
-            auto inter = w_int * h_int;
-            auto area2 = (b2.select(1, 2) - b2.select(1, 0)) *
-                         (b2.select(1, 3) - b2.select(1, 1));
-            auto ious = inter / (area1 + area2 - inter);
-
-            auto mask_keep = ious <= iou_thresh;
-            idxs = rest.index_select(0, mask_keep.nonzero().squeeze());
+        for (int i = 0; i < xyxy_cpu.size(0); ++i) {
+            if (lab_cpu[i].item<int>() != c) continue;
+            float x1 = xyxy_cpu[i][0].item<float>();
+            float y1 = xyxy_cpu[i][1].item<float>();
+            float x2 = xyxy_cpu[i][2].item<float>();
+            float y2 = xyxy_cpu[i][3].item<float>();
+            boxesC.push_back(cv::Rect(cv::Point((int)x1,(int)y1), cv::Point((int)x2,(int)y2)));
+            scoresC.push_back(conf_cpu[i].item<float>());
         }
+        if (boxesC.empty()) continue;
 
-        // === Construction des detections
-        for (int id : keep) {
-            auto box = xyxy[id];
-            Detection det;
-            det.x1 = box[0].item<float>() * frame.cols / 640.0f;
-            det.y1 = box[1].item<float>() * frame.rows / 640.0f;
-            det.x2 = box[2].item<float>() * frame.cols / 640.0f;
-            det.y2 = box[3].item<float>() * frame.rows / 640.0f;
-            det.conf = scores_sel[id].item<float>();
-            det.cls = classes_sel[id].item<int>();
-            results.push_back(det);
+        std::vector<int> indices;
+        cv::dnn::NMSBoxes(boxesC, scoresC, confTh, iouTh, indices);
+        for (int idx : indices) {
+            finalBoxes.push_back(boxesC[idx]);
+            finalScores.push_back(scoresC[idx]);
+            finalClasses.push_back(c);
         }
+    }
 
-        // === Dessin identique
-        for (const auto& det : results) {
-            cv::Scalar color;
-            QString label;
-            if (det.cls == 0) { color = cv::Scalar(0, 0, 255); label = "red"; }
-            else if (det.cls == 1) { color = cv::Scalar(0, 255, 255); label = "yellow"; }
-            else { color = cv::Scalar(192, 192, 192); label = "empty"; }
+    // --- 8) Remise à l’échelle vers image d’origine
+    for (size_t i = 0; i < finalBoxes.size(); ++i) {
+        float x1 = (finalBoxes[i].x - dw) / gain;
+        float y1 = (finalBoxes[i].y - dh) / gain;
+        float x2 = (finalBoxes[i].x + finalBoxes[i].width  - dw) / gain;
+        float y2 = (finalBoxes[i].y + finalBoxes[i].height - dh) / gain;
 
-            cv::rectangle(frame,
-                          cv::Point(det.x1, det.y1),
-                          cv::Point(det.x2, det.y2),
-                          color, 2);
-            QString txt = QString("%1 (%.2f)").arg(label).arg(det.conf);
-            cv::putText(frame, txt.toStdString(),
-                        cv::Point(det.x1, det.y1 - 5),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.6, color, 2);
-        }
+        x1 = std::clamp(x1, 0.f, (float)w0);
+        y1 = std::clamp(y1, 0.f, (float)h0);
+        x2 = std::clamp(x2, 0.f, (float)w0);
+        y2 = std::clamp(y2, 0.f, (float)h0);
 
-    } catch (const c10::Error& e) {
-        qWarning() << "[AI] ❌ Erreur pendant l'inférence Torch:" << e.what();
+        finalBoxes[i] = cv::Rect(cv::Point((int)x1,(int)y1), cv::Point((int)x2,(int)y2));
+    }
+
+    static const std::vector<std::string> names = {"red","yellow","empty"};
+    // --- 9) Dessin
+    for (size_t i = 0; i < finalBoxes.size(); ++i) {
+        int cls = finalClasses[i];
+        float sc = finalScores[i];
+        cv::Scalar color = (cls==0 ? cv::Scalar(0,0,255) :
+                                cls==1 ? cv::Scalar(0,255,255) :
+                                cv::Scalar(255,255,255));
+        cv::rectangle((cv::Mat&)frameBGR, finalBoxes[i], color, 2);
+
+        char txt[64];
+        std::snprintf(txt, sizeof(txt), "%s (%.2f)", names[cls].c_str(), sc);
+        int base;
+        auto sz = cv::getTextSize(txt, cv::FONT_HERSHEY_SIMPLEX, 0.6, 2, &base);
+        cv::rectangle((cv::Mat&)frameBGR,
+                      cv::Rect(finalBoxes[i].x, std::max(0, finalBoxes[i].y - sz.height - 6),
+                               sz.width + 6, sz.height + 6),
+                      color, cv::FILLED);
+        cv::putText((cv::Mat&)frameBGR, txt,
+                    {finalBoxes[i].x + 3, finalBoxes[i].y - 3},
+                    cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0,0,0), 2);
     }
 
     return results;
 }
-
 
 QImage CameraAI::matToQImage(const cv::Mat& mat) {
     if (mat.empty()) return {};
