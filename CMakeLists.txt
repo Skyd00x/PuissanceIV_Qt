@@ -44,7 +44,9 @@ set(PROJECT_SOURCES
     ${TS_FILES}
 )
 
-# Copie des ressources nécessaires
+# ============================================================
+# === COPIE DES RESSOURCES
+# ============================================================
 file(COPY ${CMAKE_SOURCE_DIR}/Ressources DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY ${CMAKE_SOURCE_DIR}/Model DESTINATION ${CMAKE_BINARY_DIR})
 
@@ -79,8 +81,6 @@ if (OPENCV_DLLS)
             ${OPENCV_DLLS}
             $<TARGET_FILE_DIR:PuissanceIV_QT>
     )
-else()
-    message(WARNING "⚠️ Aucune DLL OpenCV trouvée dans ${OpenCV_DIR}/x64/vc16/bin/")
 endif()
 
 # ============================================================
@@ -90,15 +90,25 @@ set(DOBOT_DIR "${CMAKE_SOURCE_DIR}/Dobot")
 include_directories("${DOBOT_DIR}")
 link_directories("${DOBOT_DIR}")
 
-if(NOT EXISTS "${DOBOT_DIR}/DobotDll.lib")
-    message(FATAL_ERROR "❌ Fichier DobotDll.lib introuvable dans ${DOBOT_DIR}")
-endif()
-
 add_custom_command(TARGET PuissanceIV_QT POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${DOBOT_DIR}/DobotDll.dll"
         $<TARGET_FILE_DIR:PuissanceIV_QT>
 )
+
+# ============================================================
+# === LIBTORCH (PyTorch C++ API)
+# ============================================================
+# 👉 La libtorch est placée à la racine du projet : ./libtorch
+set(Torch_DIR "${CMAKE_SOURCE_DIR}/libtorch/share/cmake/Torch")
+find_package(Torch REQUIRED)
+
+include_directories("${CMAKE_SOURCE_DIR}/libtorch/include")
+include_directories("${CMAKE_SOURCE_DIR}/libtorch/include/torch/csrc/api/include")
+link_directories("${CMAKE_SOURCE_DIR}/libtorch/lib")
+
+message(STATUS "✅ LibTorch trouvé : ${TORCH_LIBRARIES}")
+
 # ============================================================
 # === LIENS DES LIBRAIRIES
 # ============================================================
@@ -107,7 +117,16 @@ target_link_libraries(PuissanceIV_QT
         Qt${QT_VERSION_MAJOR}::Widgets
         ${OPENCV_LIBS}
         "${DOBOT_DIR}/DobotDll.lib"
-        "${ONNXRUNTIME_DIR}/lib/onnxruntime.lib"
+        ${TORCH_LIBRARIES}
+)
+
+# ============================================================
+# === COPIE AUTOMATIQUE DES DLLs LIBTORCH
+# ============================================================
+add_custom_command(TARGET PuissanceIV_QT POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/libtorch/lib"
+        $<TARGET_FILE_DIR:PuissanceIV_QT>
 )
 
 # ============================================================
@@ -123,16 +142,6 @@ set_target_properties(PuissanceIV_QT PROPERTIES
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
     MACOSX_BUNDLE TRUE
     WIN32_EXECUTABLE TRUE
-)
-
-# ============================================================
-# === INSTALLATION (facultatif)
-# ============================================================
-include(GNUInstallDirs)
-install(TARGETS PuissanceIV_QT
-    BUNDLE DESTINATION .
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
 if(QT_VERSION_MAJOR EQUAL 6)
