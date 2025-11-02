@@ -12,7 +12,7 @@ CameraAI::CameraAI(QObject* parent)
     connect(&workerThread, &QThread::started, this, &CameraAI::processLoop);
     moveToThread(&workerThread);
 
-    QString modelPath = QCoreApplication::applicationDirPath() + "/Model/best.torchscript";
+    QString modelPath = QCoreApplication::applicationDirPath() + "/Model/best5.torchscript";
     qDebug() << "[AI] Chargement du modèle :" << modelPath;
 
     std::filesystem::path fsPath = modelPath.toStdWString();
@@ -180,7 +180,7 @@ std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR) {
         finalBoxes[i] = cv::Rect(cv::Point((int)x1,(int)y1), cv::Point((int)x2,(int)y2));
     }
 
-    static const std::vector<std::string> names = {"red","yellow","empty"};
+    static const std::vector<std::string> names = {"r","y","e"};
     // --- 9) Dessin
     for (size_t i = 0; i < finalBoxes.size(); ++i) {
         int cls = finalClasses[i];
