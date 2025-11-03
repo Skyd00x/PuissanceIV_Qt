@@ -1,11 +1,5 @@
 #include "Robot.hpp"
 
-// === Limites mécaniques Dobot ===
-constexpr float X_MIN = -260.0f, X_MAX = 300.0f;
-constexpr float Y_MIN = -250.0f, Y_MAX = 250.0f;
-constexpr float Z_MIN = -140.0f, Z_MAX = 200.0f;
-constexpr float R_MIN = -120.0f, R_MAX = 120.0f;
-
 Robot::Robot(QObject *parent)
     : QObject(parent)
 {
@@ -49,7 +43,16 @@ bool Robot::connect()
         return false;
 
     ClearAllAlarmsState();
+    SetQueuedCmdStartExec();
     return true;
+}
+
+void Robot::disconnect()
+{
+    // Stoppe la file d’attente
+    SetQueuedCmdStopExec();
+    SetQueuedCmdClear();
+    DisconnectDobot();
 }
 
 bool Robot::isAvailable()
@@ -65,42 +68,17 @@ void Robot::Home()
 {
     HOMECmd homeCmd = {0};
     uint64_t idx = 0;
-    SetHOMECmd(&homeCmd, false, &idx);
-    wait(5.0f); // Attente de sécurité (5 secondes)
+    SetQueuedCmdClear();        // vide la file d’attente
+    SetQueuedCmdStartExec();    // démarre l’exécution
+    SetHOMECmd(&homeCmd, true, &idx);
+    waitForCompletion(idx);
 }
-
-bool Robot::isMoving() const
-{
-    Pose prev, curr;
-    GetPose(&prev);
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    GetPose(&curr);
-
-    // Si la différence entre les deux positions est significative → le robot bouge
-    auto diff = [](float a, float b) { return std::fabs(a - b); };
-    const float threshold = 0.5f; // tolérance (mm)
-
-    bool moving =
-        diff(prev.x, curr.x) > threshold ||
-        diff(prev.y, curr.y) > threshold ||
-        diff(prev.z, curr.z) > threshold ||
-        diff(prev.r, curr.r) > 1.0f; // tolérance plus large sur la rotation
-
-    return moving;
-}
-
 
 // =====================================================
 // === Déplacements ===
 // =====================================================
 void Robot::goTo(Pose p)
 {
-    // Bornes de sécurité
-    p.x = std::clamp(p.x, X_MIN, X_MAX);
-    p.y = std::clamp(p.y, Y_MIN, Y_MAX);
-    p.z = std::clamp(p.z, Z_MIN, Z_MAX);
-    p.r = std::clamp(p.r, R_MIN, R_MAX);
-
     PTPCmd cmd = {0};
     cmd.ptpMode = PTPMOVJXYZMode;
     cmd.x = p.x;
@@ -110,13 +88,28 @@ void Robot::goTo(Pose p)
 
     uint64_t idx = 0;
     SetPTPCmd(&cmd, false, &idx);
-    wait(0.4f);
+    waitForCompletion(idx);
 }
 
-void Robot::goTo(Pose p, float z)
+void Robot::goToSecurized(Pose target)
 {
-    p.z = z;
-    goTo(p);
+    Pose current;
+    GetPose(&current);
+
+    // Étape 1 : remonter à une hauteur sûre pour bouger
+    Pose zOk = current;
+    zOk.z = current.z + 100.0f;
+    if (zOk.z > 150.0f) zOk.z = 150.0f;
+    goTo(zOk);
+
+    // Étape 2 : Aller à la cible avec marge hauteur
+    Pose TargetHauteurOk = target;
+    TargetHauteurOk.z += 50.0f;
+    if (TargetHauteurOk.z > 150.0f) TargetHauteurOk.z = 150.0f;
+    goTo(TargetHauteurOk);
+
+    // Étape 5 : Aller à la cible
+    goTo(target);
 }
 
 // =====================================================
@@ -127,7 +120,7 @@ void Robot::rotate(float delta)
     Pose p;
     GetPose(&p);
 
-    p.r = std::clamp(p.r + delta, R_MIN, R_MAX);
+    p.r = std::clamp(p.r + delta, -100.0f, 100.0f);
 
     PTPCmd cmd = {0};
     cmd.ptpMode = PTPMOVJXYZMode;
@@ -137,8 +130,10 @@ void Robot::rotate(float delta)
     cmd.r = p.r;
 
     uint64_t idx = 0;
-    SetPTPCmd(&cmd, false, &idx);
-    wait(0.2f);
+    SetQueuedCmdClear();        // vide la file d’attente
+    SetQueuedCmdStartExec();    // démarre l’exécution
+    SetPTPCmd(&cmd, true, &idx);
+    waitForCompletion(idx);
 }
 
 // =====================================================
@@ -151,19 +146,25 @@ void Robot::turnOffGripper(){ gripper(false, false); }
 void Robot::gripper(bool enable, bool grip)
 {
     uint64_t idx = 0;
-    SetEndEffectorGripper(enable, grip, false, &idx);
+    SetQueuedCmdClear();        // vide la file d’attente
+    SetQueuedCmdStartExec();    // démarre l’exécution
+    SetEndEffectorGripper(enable, grip, true, &idx);
 }
 
 // =====================================================
-// === Temporisation interne ===
+// === Temporisation ===
 // =====================================================
-void Robot::wait(float seconds)
+void Robot::waitForCompletion(uint64_t targetIndex)
 {
-    WAITCmd cmd = { static_cast<uint32_t>(seconds * 1000) };
-    uint64_t idx = 0;
-    SetWAITCmd(&cmd, false, &idx);
+    uint64_t currentIndex = 0;
+    while (true)
+    {
+        GetQueuedCmdCurrentIndex(&currentIndex);
+        if (currentIndex >= targetIndex)
+            break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
 }
-
 // =====================================================
 // === Accès aux coordonnées ===
 // =====================================================

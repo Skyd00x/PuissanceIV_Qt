@@ -5,12 +5,12 @@
 
 // === DEBUG FLAGS ===
 #define DEBUG_VISION       0   // Mode debug de la vision classique
-#define DEBUG_VISIONAI     1   // Mode debug IA (ONNX)
+#define DEBUG_VISIONAI     0   // Mode debug IA (ONNX)
 #define DEBUG_INTRO        0
 #define DEBUG_CHECK        0
 #define DEBUG_MENU         0
 #define DEBUG_GAME         0
-#define DEBUG_CALIBRATION  0
+#define DEBUG_CALIBRATION  1
 
 int main(int argc, char *argv[])
 {

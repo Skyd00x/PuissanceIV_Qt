@@ -15,9 +15,11 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QPixmap>
-#include <QGraphicsOpacityEffect>
+#include <QColor>
+#include <QShowEvent>
+#include <QFrame>
 
-#include "calibrationLogic.hpp"
+#include "CalibrationLogic.hpp"   // adapte la casse au nom réel de ton fichier
 #include "Robot.hpp"
 
 class CalibrationScreen : public QWidget {
@@ -53,24 +55,32 @@ public slots:
     void onLogicProgress(int value);
     void onFadeAnimationFinished();
 
+protected:
+    void showEvent(QShowEvent* event) override;
+
 private:
-    void styleButton(QPushButton* button, const QString &c1 = "#4F8ED8", const QString &c2 = "#1B3B5F");
-    void applyRoundedImageEffect(QLabel *label, const QString &imagePath);
-    void showIntroLayout();
+    // Prépare l’UI d’intro (sans auto-connexion)
+    void prepareIntroUI(const QString& message = QStringLiteral("Connexion au robot en cours..."));
+    // Affiche l’intro ; si autoConnect == true, lance (ou planifie) la connexion
+    void showIntroLayout(bool autoConnect);
     void showCalibrationLayout();
     void showEndLayout();
+
+    void styleButton(QPushButton* button, const QString &c1 = "#4F8ED8", const QString &c2 = "#1B3B5F");
+    void applyRoundedImageEffect(QLabel *label, const QString &imagePath);
 
     // === Données ===
     Robot* robot;
     CalibrationLogic* logic;
     int currentStep = -1;
-    bool pendingUpdate = false;
+
+    // État de tentative de connexion en cours (évite les doubles appels)
+    bool isConnecting = false;
 
     // === Éléments communs ===
     QLabel* titleLabel;
     QProgressBar* progressBar;
     QPropertyAnimation* fadeAnimation;
-    QTimer* connectionTimer;
     QStackedLayout* stackedLayout;
 
     // === Layouts ===
@@ -86,7 +96,7 @@ private:
     QPushButton* retryButton;
 
     // === Calibration ===
-    QTextBrowser* instructionsView; // ✅ remplace QLabel
+    QTextBrowser* instructionsView;
     QLabel* imageLabel;
     QPushButton* nextButton;
     QPushButton* backButton;

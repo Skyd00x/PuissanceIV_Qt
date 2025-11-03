@@ -36,24 +36,21 @@ bool CalibrationLogic::connectToRobot() {
     return connected;
 }
 
+void CalibrationLogic::disconnectToRobot() {
+    if (robot)
+        robot->turnOffGripper();
+        robot->disconnect();
+    connected = false;
+    gripperOpen = false;
+}
+
 void CalibrationLogic::homeRobot() {
     if (!connected || !robot) return;
 
     std::thread([this]() {
         robot->Home();
-        waitForRobotStable();
         QMetaObject::invokeMethod(this, [this]() { emit robotReady(); }, Qt::QueuedConnection);
     }).detach();
-}
-
-void CalibrationLogic::waitForRobotStable() {
-    int stableCount = 0;
-    while (true) {
-        if (!robot->isMoving()) stableCount++;
-        else stableCount = 0;
-        if (stableCount >= 5) break;
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    }
 }
 
 // === Calibration ===
@@ -192,11 +189,7 @@ void CalibrationLogic::testCalibration() {
         qDebug() << "Nombre total de positions testées:" << total;
 
         for (int i = 0; i < total; ++i) {
-            robot->goTo(calibrationData[i].pose);
-
-            while (robot->isMoving()) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(150));
-            }
+            robot->goToSecurized(calibrationData[i].pose);
 
             // 🔹 Calcul précis du pourcentage (float → int)
             double ratio = double(i + 1) / double(total);
@@ -218,7 +211,6 @@ void CalibrationLogic::testCalibration() {
         }, Qt::QueuedConnection);
     }).detach();
 }
-
 
 // === Manipulations manuelles ===
 void CalibrationLogic::toggleGripper() {

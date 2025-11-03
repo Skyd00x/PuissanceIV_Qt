@@ -31,6 +31,7 @@ public:
     explicit CalibrationLogic(Robot* robot, QObject* parent = nullptr);
 
     bool connectToRobot();
+    void disconnectToRobot();
     void homeRobot();
     void startCalibration();
     void recordStep(int index);
@@ -54,7 +55,6 @@ signals:
     void calibrationTestFinished();
 
 private:
-    void waitForRobotStable();
     std::vector<Pose> interpolatePoints(const Pose& start, const Pose& end, int count);
     void computeAllPositions();  // 🔹 génère tous les points calculés
 

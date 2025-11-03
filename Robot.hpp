@@ -11,7 +11,6 @@
 #include <thread>
 #include <chrono>
 #include <array>
-
 // === SDK Dobot Magician ===
 #include "DobotDll.h"
 
@@ -29,13 +28,13 @@ public:
 
     // === Connexion et disponibilité ===
     bool connect();
+    void disconnect();
     static bool isAvailable();
 
     // === Mouvements de base ===
     void Home();
-    bool isMoving() const;
     void goTo(Pose p);
-    void goTo(Pose p, float z);
+    void goToSecurized(Pose target);
     void rotate(float delta);
 
     // === Contrôle de la pince ===
@@ -48,7 +47,7 @@ public:
     Pose getPiecePose(int i) const;
 
     // === Temporisation ===
-    void wait(float seconds);
+    void waitForCompletion(uint64_t targetIndex);
 
 private:
     // === Méthodes internes ===
