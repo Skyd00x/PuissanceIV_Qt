@@ -4,6 +4,10 @@
 #include <QStackedWidget>
 #include <QDebug>
 #include <QCloseEvent>
+#include <QApplication>
+#include <QDebug>
+#include <QLabel>
+#include <QTimer>
 #include "Robot.hpp"
 #include "Camera.hpp"
 #include "CameraAi.hpp"

@@ -1,16 +1,13 @@
 #include "MainWindow.hpp"
-#include "CameraAi.hpp"
-#include <QApplication>
-#include <QDebug>
 
 // === DEBUG FLAGS ===
-#define DEBUG_VISION       0   // Mode debug de la vision classique
-#define DEBUG_VISIONAI     0   // Mode debug IA (ONNX)
+#define DEBUG_VISION       0
+#define DEBUG_VISIONAI     1
 #define DEBUG_INTRO        0
 #define DEBUG_CHECK        0
 #define DEBUG_MENU         0
 #define DEBUG_GAME         0
-#define DEBUG_CALIBRATION  1
+#define DEBUG_CALIBRATION  0
 
 int main(int argc, char *argv[])
 {
@@ -25,6 +22,30 @@ int main(int argc, char *argv[])
     QObject::connect(&ai, &CameraAI::frameReady, &label, [&](const QImage& img){
         label.setPixmap(QPixmap::fromImage(img).scaled(1280, 720, Qt::KeepAspectRatio));
     }, Qt::QueuedConnection);
+
+    // --- Impression périodique de la grille (toutes les 1s) ---
+    QTimer* gridPrinter = new QTimer(&app);
+    gridPrinter->setInterval(1000); // 1000 ms
+    QObject::connect(gridPrinter, &QTimer::timeout, [&](){
+        QVector<QVector<int>> grid;
+        const int r = ai.getGrille(grid);
+        if (r == 0) {
+            // Grille complète : 6x7 ; 0=vide, 1=rouge, 2=jaune
+            QString out = "\n=== GRID ===\n";
+            for (const auto& row : grid) {
+                QString line;
+                for (int c = 0; c < row.size(); ++c) {
+                    line += QString::number(row[c]);
+                    if (c < row.size() - 1) line += ' ';
+                }
+                out += line + '\n';
+            }
+            qDebug().noquote() << out;
+        } else {
+            qDebug() << "[GRID] Incomplète — en attente d'une détection complète (6x7).";
+        }
+    });
+    gridPrinter->start();
 
     return app.exec();
 #elif DEBUG_VISION

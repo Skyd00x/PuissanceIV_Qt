@@ -3,16 +3,18 @@
 #include <QDir>
 #include <QCoreApplication>
 #include <filesystem>
+#include <algorithm>
 #include <torch/script.h>
 #include <torch/torch.h>
 
 CameraAI::CameraAI(QObject* parent)
-    : QObject(parent), running(false)
+    : QObject(parent), running(false),
+    grid_(rows_, QVector<int>(cols_, 0)), gridComplete_(false)
 {
     connect(&workerThread, &QThread::started, this, &CameraAI::processLoop);
     moveToThread(&workerThread);
 
-    QString modelPath = QCoreApplication::applicationDirPath() + "/Model/best5.torchscript";
+    QString modelPath = QCoreApplication::applicationDirPath() + "/Model/best7.torchscript";
     qDebug() << "[AI] Chargement du modèle :" << modelPath;
 
     std::filesystem::path fsPath = modelPath.toStdWString();
@@ -54,6 +56,13 @@ void CameraAI::stop() {
     qDebug() << "[AI] 🛑 Capture arrêtée";
 }
 
+int CameraAI::getGrille(QVector<QVector<int>>& out) const {
+    QMutexLocker lock(&gridMutex_);
+    if (!gridComplete_) return -1;
+    out = grid_; // copie
+    return 0;
+}
+
 void CameraAI::processLoop() {
     try {
         cv::Mat frame;
@@ -62,8 +71,11 @@ void CameraAI::processLoop() {
             if (frame.empty()) continue;
 
             auto dets = inferTorch(frame);
+            updateGrid(dets); // met à jour l'état de la grille
+
             QImage img = matToQImage(frame);
             emit frameReady(img);
+
             QThread::msleep(30);
         }
     } catch (const std::exception& e) {
@@ -76,7 +88,7 @@ std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR) {
     if (!model || frameBGR.empty()) return results;
 
     // --- 1) LetterBox
-    const int imgsz = 640;
+    const int imgsz = 960;
     const cv::Scalar padColor(114,114,114);
     int h0 = frameBGR.rows, w0 = frameBGR.cols;
     float gain = std::min((float)imgsz / h0, (float)imgsz / w0);
@@ -96,9 +108,6 @@ std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR) {
     at::Tensor input = torch::from_blob(lb.data, {1, imgsz, imgsz, 3}, at::kFloat)
                            .permute({0,3,1,2}).contiguous();
 
-    // Debug input size
-    //qDebug() << "[AI] Input tensor size:" << QString::fromStdString(at::toString(input.sizes()));
-
     // --- 3) Inference
     torch::NoGradGuard noGrad;
     at::Tensor out;
@@ -108,7 +117,6 @@ std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR) {
         qWarning() << "[AI] ❌ Erreur inférence:" << e.what();
         return results;
     }
-    //qDebug() << "[AI] Sortie modèle:" << QString::fromStdString(at::toString(out.sizes()));
 
     // --- 4) Process output
     out = out.squeeze(0).permute({1,0});            // [N, 4+nc]
@@ -143,7 +151,6 @@ std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR) {
     for (int c = 0; c < nc; ++c) {
         std::vector<cv::Rect> boxesC;
         std::vector<float>    scoresC;
-        std::vector<int>      idxC;
 
         for (int i = 0; i < xyxy_cpu.size(0); ++i) {
             if (lab_cpu[i].item<int>() != c) continue;
@@ -181,10 +188,24 @@ std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR) {
     }
 
     static const std::vector<std::string> names = {"r","y","e"};
-    // --- 9) Dessin
+
+    // --- 9) Dessin + remplir 'results'
+    results.reserve(finalBoxes.size());
     for (size_t i = 0; i < finalBoxes.size(); ++i) {
         int cls = finalClasses[i];
         float sc = finalScores[i];
+
+        // push dans le vecteur retourné
+        Detection d;
+        d.x1   = (float)finalBoxes[i].x;
+        d.y1   = (float)finalBoxes[i].y;
+        d.x2   = (float)(finalBoxes[i].x + finalBoxes[i].width);
+        d.y2   = (float)(finalBoxes[i].y + finalBoxes[i].height);
+        d.conf = sc;
+        d.cls  = cls; // 0=r,1=y,2=e
+        results.push_back(d);
+
+        // Dessin
         cv::Scalar color = (cls==0 ? cv::Scalar(0,0,255) :
                                 cls==1 ? cv::Scalar(0,255,255) :
                                 cv::Scalar(255,255,255));
@@ -204,6 +225,58 @@ std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR) {
     }
 
     return results;
+}
+
+void CameraAI::updateGrid(const std::vector<Detection>& dets) {
+    // On attend 6x7 = 42 cellules (r, y ou e). Sinon -> grille incomplète.
+    if ((int)dets.size() != rows_ * cols_) {
+        QMutexLocker lock(&gridMutex_);
+        gridComplete_ = false;
+        return;
+    }
+
+    struct Cell { float cx, cy; int val; };
+    std::vector<Cell> cells;
+    cells.reserve(dets.size());
+
+    // mapping: det.cls 0=r,1=y,2=e -> 1,2,0
+    auto mapVal = [](int cls)->int {
+        if (cls == 2) return 0; // empty
+        if (cls == 0) return 1; // red
+        return 2;               // yellow
+    };
+
+    for (const auto& d : dets) {
+        float cx = 0.5f * (d.x1 + d.x2);
+        float cy = 0.5f * (d.y1 + d.y2);
+        cells.push_back({cx, cy, mapVal(d.cls)});
+    }
+
+    // Trier par Y (du haut vers le bas), puis découper en 6 lignes de 7
+    std::sort(cells.begin(), cells.end(),
+              [](const Cell& a, const Cell& b){ return a.cy < b.cy; });
+
+    QVector<QVector<int>> newGrid(rows_, QVector<int>(cols_, 0));
+
+    bool ok = true;
+    for (int r = 0; r < rows_; ++r) {
+        int start = r * cols_;
+        int end   = start + cols_;
+        if (end > (int)cells.size()) { ok = false; break; }
+
+        // trier la "ligne" par X (gauche->droite)
+        std::sort(cells.begin() + start, cells.begin() + end,
+                  [](const Cell& a, const Cell& b){ return a.cx < b.cx; });
+
+        for (int c = 0; c < cols_; ++c) {
+            newGrid[r][c] = cells[start + c].val;
+        }
+    }
+
+    QMutexLocker lock(&gridMutex_);
+    grid_ = std::move(newGrid);
+    gridComplete_ = ok;
+    if (gridComplete_) emit gridUpdated(grid_);
 }
 
 QImage CameraAI::matToQImage(const cv::Mat& mat) {
