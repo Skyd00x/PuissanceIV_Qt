@@ -1,8 +1,7 @@
 #include "MainWindow.hpp"
 
 // === DEBUG FLAGS ===
-#define DEBUG_VISION       0
-#define DEBUG_VISIONAI     0
+#define DEBUG_VISIONAI     1
 #define DEBUG_INTRO        0
 #define DEBUG_CHECK        0
 #define DEBUG_MENU         0
@@ -52,12 +51,6 @@ int main(int argc, char *argv[])
     gridPrinter->start();
 
     return app.exec();
-#elif DEBUG_VISION
-    // === MODE DEBUG VISION CLASSIQUE ===
-    Camera cam;
-    cam.debugVision();
-    return 0;
-
 #else
     // === MODE APPLICATION COMPLÈTE ===
     QApplication app(argc, argv);
