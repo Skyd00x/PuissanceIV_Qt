@@ -1,5 +1,5 @@
 #include "Negamax.hpp"
-#include "MonteCarlo.hpp"
+/*
 
 int columnOrder[7] = { 3, 2, 4, 1, 5, 0, 6 };
 
@@ -184,16 +184,7 @@ int Negamax::Evaluate(Board terminalBoard)
 
 int Negamax::Negamax(Board board, int alpha, int beta, TranspositionTable* transpositionTable, unsigned int depth)
 {
-	//The transposition table is not working properly, so it is commented out
-	//It is supposed to store the values of the boards that have already been evaluated
-	//and return the value if the board is already in the table, instead of evaluating it again
-	//This is supposed to speed up the algorithm, but it is not
-	/*
-	if (transpositionTable->contains(board))
-	{
-		return transpositionTable->get(board);
-	}
-	*/
+
 
 	if (depth == 0 || board.isTerminal())
 	{
@@ -232,11 +223,11 @@ int Negamax::Negamax(Board board, int alpha, int beta, TranspositionTable* trans
 				}
 			}
 		}
-		/*
+
 		if (board.isTerminal())
 		{
 			transpositionTable->put(board, value);
-		}*/
+        }
 
 		return value;
 	}
@@ -283,3 +274,4 @@ int Negamax::GetBestMoveEarlyGame(Board board)
 		return 3;
 	}
 }
+*/

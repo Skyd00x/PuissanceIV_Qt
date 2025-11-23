@@ -2,11 +2,12 @@
 
 #include <thread>
 #include <iostream>
-#include "Board.hpp"
 #include "TranspositionTable.hpp"
 
 namespace Negamax
 {
+    /*
+
 	/// <summary>
 	/// Get the best move for the current player, using the negamax algorithm.
 	/// </summary>
@@ -49,4 +50,5 @@ namespace Negamax
 	int compareColumnOrder(int a, int b);
 
 	int GetBestMoveEarlyGame(Board board);
+*/
 }

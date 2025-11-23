@@ -1,11 +1,10 @@
 #pragma once
 
 #include <vector>
-#include "Board.hpp"
 
 class TranspositionTable
 {
-	/// <summary>
+    /*/// <summary>
 	/// Transposition table element, storing the board in a 56 bit array, and the evaluated value of the board
 	/// </summary>
 	struct Entry
@@ -65,5 +64,6 @@ private:
 	/// <param name="board">Board get the key</param>
 	/// <returns>Bitboard key corresponding to a Board object</returns>
 	uint64_t getKey(Board board);
+*/
 };
 

@@ -1,5 +1,5 @@
 #include "TranspositionTable.hpp"
-
+/*
 TranspositionTable::TranspositionTable()
 {
 	transpositionTable.resize(size);
@@ -59,5 +59,5 @@ uint64_t TranspositionTable::getKey(Board board)
 		return board.getPlayerBitboard();
 	}
 }
-
+*/
 

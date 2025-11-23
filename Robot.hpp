@@ -1,22 +1,17 @@
 #pragma once
 
-#include <QObject>
-#include <QJsonObject>
-#include <QJsonDocument>
-#include <QFile>
-#include <QString>
-#include <QDebug>
-#include <algorithm>
-#include <cmath>
 #include <thread>
 #include <chrono>
-#include <array>
+#include <QObject>
+#include <algorithm>
 // === SDK Dobot Magician ===
 #include "DobotDll.h"
 
+// Pose est fourni par le SDK Dobot : structure contenant {x, y, z, r}
+// ---------------------------------------------------------------------
+
 // ============================================================================
-//  Classe Robot : Gère le pilotage matériel du Dobot Magician
-//  (connexion, mouvements, pince, rotations, etc.)
+//  Classe Robot : Gestion du Dobot Magician (connexion, mouvements, pince…)
 // ============================================================================
 class Robot : public QObject
 {
@@ -24,36 +19,29 @@ class Robot : public QObject
 
 public:
     explicit Robot(QObject *parent = nullptr);
-    ~Robot();
+    ~Robot() override = default;
 
-    // === Connexion et disponibilité ===
-    bool connect();
-    void disconnect();
-    static bool isAvailable();
+    // === Connexion au robot ===
+    bool connect();       // Connecte le robot si un Dobot est détecté
+    void disconnect();    // Déconnecte proprement et vide la file de commandes
+    static bool isAvailable();   // Vérifie si un Dobot est détectable
 
-    // === Mouvements de base ===
-    void Home();
-    void goTo(Pose p);
-    void goToSecurized(Pose target);
-    void rotate(float delta);
+    // === Mouvements ===
+    void Home();                 // Retourne le robot en position Home
+    void goTo(Pose p);           // Déplacement direct (PTP)
+    void goToSecurized(Pose p);  // Déplacement sécurisé
+    void rotate(float delta);    // Rotation relative de la pince
 
     // === Contrôle de la pince ===
-    void openGripper();
-    void closeGripper();
-    void turnOffGripper();
-
-    // === Accès aux positions calibrées ===
-    Pose getColumnPose(int i) const;
-    Pose getPiecePose(int i) const;
-
-    // === Temporisation ===
-    void waitForCompletion(uint64_t targetIndex);
+    void openGripper();          // Ouvre la pince
+    void closeGripper();         // Ferme la pince
+    void turnOffGripper();       // Désactive l’alimentation de la pince
 
 private:
-    // === Méthodes internes ===
+    // === Méthode interne pour le gripper ===
     void gripper(bool enable, bool grip);
 
-    // === Coordonnées calibrées ===
-    std::array<Pose, 7> columnCoordinates;
-    std::array<Pose, 8> pieceCoordinates;
+    // === Attente que la file d’attente du robot atteigne un index ===
+    void waitForCompletion(uint64_t targetIndex);
 };
+

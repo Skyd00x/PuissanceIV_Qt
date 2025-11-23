@@ -1,11 +1,13 @@
 #include "CheckDevicesScreen.hpp"
-#include "Camera.hpp"
+#include "CameraAi.hpp"
 #include "Robot.hpp"
+
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFile>
 #include <QDebug>
 #include <QTimer>
+#include <QPropertyAnimation>
 
 // ====================== DeviceChecker ======================
 
@@ -14,14 +16,18 @@ DeviceChecker::DeviceChecker(QObject *parent)
 {
 }
 
-DeviceChecker::~DeviceChecker() {}
+DeviceChecker::~DeviceChecker()
+{
+}
 
 void DeviceChecker::checkDevices()
 {
-    bool camOk = Camera::isAvailable();
+    bool camOk = CameraAI::isAvailable();
     bool robOk = Robot::isAvailable();
+
     emit statusUpdated(camOk, robOk);
 }
+
 
 // ====================== CheckDevicesScreen ======================
 
@@ -31,48 +37,44 @@ CheckDevicesScreen::CheckDevicesScreen(QWidget *parent)
     setStyleSheet("background-color: white;");
     setAttribute(Qt::WA_StyledBackground, true);
 
-    // === Titre principal ===
+    // === Titre ===
     QLabel *title = new QLabel("Vérification des équipements nécessaires");
     title->setAlignment(Qt::AlignCenter);
     title->setStyleSheet("font-size: 40px; font-weight: bold; color: black;");
 
-    // === Icônes caméra et robot ===
+    // === Chargement images ===
+    auto loadImage = [&](const QString &path, QSize size) -> QPixmap {
+        if (!QFile::exists(path))
+            qWarning() << "Image introuvable:" << path;
+        QPixmap pix(path);
+        if (pix.isNull())
+            qWarning() << "Échec chargement:" << path;
+        return pix.scaled(size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    };
+
+    // === Icônes ===
     cameraIcon = new QLabel(this);
-    QString cameraPath = "./Ressources/image/camera.png";
-    if (!QFile::exists(cameraPath))
-        qWarning() << "Image caméra introuvable:" << cameraPath;
-    QPixmap cameraPixmap(cameraPath);
-    if (cameraPixmap.isNull())
-        qWarning() << "Échec chargement caméra:" << cameraPath;
-    else
-        cameraIcon->setPixmap(cameraPixmap.scaled(128, 128, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    cameraIcon->setPixmap(loadImage("./Ressources/image/camera.png", {128,128}));
     cameraIcon->setAlignment(Qt::AlignCenter);
 
     robotIcon = new QLabel(this);
-    QString robotPath = "./Ressources/image/robot.png";
-    if (!QFile::exists(robotPath))
-        qWarning() << "Image robot introuvable:" << robotPath;
-    QPixmap robotPixmap(robotPath);
-    if (robotPixmap.isNull())
-        qWarning() << "Échec chargement robot:" << robotPath;
-    else
-        robotIcon->setPixmap(robotPixmap.scaled(128, 128, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    robotIcon->setPixmap(loadImage("./Ressources/image/robot.png", {128,128}));
     robotIcon->setAlignment(Qt::AlignCenter);
 
-    // === Statuts ===
+    // === Labels statut ===
     cameraStatusIcon = new QLabel(this);
     robotStatusIcon  = new QLabel(this);
     cameraStatusLabel = new QLabel("Vérification...");
     robotStatusLabel  = new QLabel("Vérification...");
-    cameraStatusIcon->setAlignment(Qt::AlignCenter);
-    robotStatusIcon->setAlignment(Qt::AlignCenter);
+
     cameraStatusLabel->setAlignment(Qt::AlignCenter);
-    robotStatusLabel->setAlignment(Qt::AlignCenter);
-
+    robotStatusLabel ->setAlignment(Qt::AlignCenter);
     cameraStatusLabel->setStyleSheet("font-size: 20px; color: black;");
-    robotStatusLabel->setStyleSheet("font-size: 20px; color: black;");
+    robotStatusLabel ->setStyleSheet("font-size: 20px; color: black;");
+    cameraStatusIcon->setAlignment(Qt::AlignCenter);
+    robotStatusIcon ->setAlignment(Qt::AlignCenter);
 
-    // === Bouton continuer (bleu, plus grand) ===
+    // === Bouton continuer ===
     continueButton = new QPushButton("Continuer", this);
     continueButton->setVisible(false);
     continueButton->setStyleSheet(
@@ -100,7 +102,6 @@ CheckDevicesScreen::CheckDevicesScreen(QWidget *parent)
     devicesLayout->addLayout(robotLayout);
     devicesLayout->addStretch();
 
-    // Conteneur du bouton avec espace réservé pour éviter le décalage
     QHBoxLayout *buttonLayout = new QHBoxLayout;
     buttonLayout->addStretch();
     buttonLayout->addWidget(continueButton);
@@ -108,9 +109,8 @@ CheckDevicesScreen::CheckDevicesScreen(QWidget *parent)
 
     QWidget *buttonContainer = new QWidget(this);
     buttonContainer->setLayout(buttonLayout);
-    buttonContainer->setMinimumHeight(100); // réserve l’espace pour le bouton, même caché
+    buttonContainer->setMinimumHeight(100);
 
-    // === Layout principal ===
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->addWidget(title);
     mainLayout->addStretch();
@@ -118,19 +118,20 @@ CheckDevicesScreen::CheckDevicesScreen(QWidget *parent)
     mainLayout->addStretch();
     mainLayout->addWidget(buttonContainer, 0, Qt::AlignCenter);
     mainLayout->setContentsMargins(60, 40, 60, 60);
-    mainLayout->setSpacing(20);
-    setLayout(mainLayout);
 
-    // === Effet de fondu ===
+    // === Effet = fade-in/out ===
     opacityEffect = new QGraphicsOpacityEffect(this);
     setGraphicsEffect(opacityEffect);
     opacityEffect->setOpacity(0.0);
 
-    // === Thread de vérification ===
+    // === Thread checker ===
     checker = new DeviceChecker();
     checker->moveToThread(&checkerThread);
+
     connect(&checkerThread, &QThread::started, checker, &DeviceChecker::checkDevices);
     connect(checker, &DeviceChecker::statusUpdated, this, &CheckDevicesScreen::updateStatus);
+
+    // Destruction propre
     connect(&checkerThread, &QThread::finished, checker, &QObject::deleteLater);
 }
 
@@ -148,53 +149,58 @@ void CheckDevicesScreen::startChecking()
 
 void CheckDevicesScreen::updateStatus(bool cameraOk, bool robotOk)
 {
-    QString checkGreenPath = "./Ressources/image/check_green.png";
-    QString crossRedPath   = "./Ressources/image/cross_red.png";
+    auto imgOk  = QPixmap("./Ressources/image/check_green.png");
+    auto imgBad = QPixmap("./Ressources/image/cross_red.png");
 
-    QPixmap checkGreen(checkGreenPath);
-    QPixmap crossRed(crossRedPath);
-
-    if (checkGreen.isNull()) qWarning() << "Image check_green introuvable:" << checkGreenPath;
-    if (crossRed.isNull()) qWarning() << "Image cross_red introuvable:" << crossRedPath;
-
-    cameraStatusIcon->setPixmap((cameraOk ? checkGreen : crossRed)
+    cameraStatusIcon->setPixmap((cameraOk ? imgOk : imgBad)
                                     .scaled(48,48,Qt::KeepAspectRatio,Qt::SmoothTransformation));
-    robotStatusIcon->setPixmap((robotOk ? checkGreen : crossRed)
+    robotStatusIcon->setPixmap((robotOk ? imgOk : imgBad)
                                    .scaled(48,48,Qt::KeepAspectRatio,Qt::SmoothTransformation));
 
     cameraStatusLabel->setText(cameraOk ? "Connectée" : "Non connectée");
-    robotStatusLabel->setText(robotOk ? "Connecté" : "Non connecté");
-    cameraStatusLabel->setStyleSheet(QString("font-size:20px; color:%1;").arg(cameraOk ? "green" : "red"));
-    robotStatusLabel->setStyleSheet(QString("font-size:20px; color:%1;").arg(robotOk ? "green" : "red"));
+    robotStatusLabel ->setText(robotOk ? "Connecté"   : "Non connecté");
+
+    cameraStatusLabel->setStyleSheet(QString("font-size:20px; color:%1;")
+                                         .arg(cameraOk ? "green" : "red"));
+    robotStatusLabel ->setStyleSheet(QString("font-size:20px; color:%1;")
+                                        .arg(robotOk ? "green" : "red"));
 
     continueButton->setVisible(cameraOk && robotOk);
 
-    // Vérification périodique
+    // Re-check toutes les 2 sec
     if (checkerThread.isRunning())
         QTimer::singleShot(2000, checker, &DeviceChecker::checkDevices);
 }
 
 void CheckDevicesScreen::fadeIn()
 {
-    QPropertyAnimation *anim = new QPropertyAnimation(opacityEffect, "opacity");
-    anim->setDuration(1000);
-    anim->setStartValue(0.0);
-    anim->setEndValue(1.0);
-    anim->start(QAbstractAnimation::DeleteWhenStopped);
+    auto *a = new QPropertyAnimation(opacityEffect, "opacity");
+    a->setDuration(800);
+    a->setStartValue(0.0);
+    a->setEndValue(1.0);
+    a->start(QAbstractAnimation::DeleteWhenStopped);
 }
 
 void CheckDevicesScreen::fadeOut()
 {
-    QPropertyAnimation *anim = new QPropertyAnimation(opacityEffect, "opacity");
-    anim->setDuration(1000);
-    anim->setStartValue(1.0);
-    anim->setEndValue(0.0);
-    connect(anim, &QPropertyAnimation::finished, this, &CheckDevicesScreen::finishedFadeOut);
-    anim->start(QAbstractAnimation::DeleteWhenStopped);
+    auto *a = new QPropertyAnimation(opacityEffect, "opacity");
+    a->setDuration(800);
+    a->setStartValue(1.0);
+    a->setEndValue(0.0);
+
+    connect(a, &QPropertyAnimation::finished, this, &CheckDevicesScreen::finishedFadeOut);
+    a->start(QAbstractAnimation::DeleteWhenStopped);
 }
 
 void CheckDevicesScreen::onContinueClicked()
 {
+    // Stop checking before leaving this screen
+    checkerThread.quit();
+    checkerThread.wait();
+    disconnect(checker, nullptr, this, nullptr);
+
     fadeOut();
-    connect(this, &CheckDevicesScreen::finishedFadeOut, this, &CheckDevicesScreen::readyToContinue);
+
+    connect(this, &CheckDevicesScreen::finishedFadeOut,
+            this, &CheckDevicesScreen::readyToContinue);
 }

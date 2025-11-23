@@ -2,20 +2,14 @@
 
 #include <QMainWindow>
 #include <QStackedWidget>
-#include <QDebug>
-#include <QCloseEvent>
 #include <QApplication>
-#include <QDebug>
-#include <QLabel>
-#include <QTimer>
+
 #include "Robot.hpp"
-#include "Camera.hpp"
 #include "CameraAi.hpp"
 #include "StateMachine.hpp"
 #include "IntroScreen.hpp"
 #include "CheckDevicesScreen.hpp"
 #include "MainMenu.hpp"
-#include "GameUI.hpp"
 #include "CalibrationScreen.hpp"
 #include "ExplanationScreen.hpp"
 
@@ -31,7 +25,6 @@ public:
     void showIntro();
     void showCheck();
     void showMenu();
-    void showGame();
     void showCalibration();
 
 protected:
@@ -39,17 +32,16 @@ protected:
 
 private:
     QStackedWidget *stack = nullptr;
-    Robot *robot = nullptr;
-    Camera *camera = nullptr;
-    CameraAI* cameraAI = nullptr;
+
+    Robot      *robot     = nullptr;
+    CameraAI   *cameraAI  = nullptr;
     StateMachine stateMachine;
 
-    IntroScreen *introScreen = nullptr;
-    CheckDevicesScreen *checkScreen = nullptr;
-    MainMenu *mainMenu = nullptr;
-    GameUI *gameUI = nullptr;
-    CalibrationScreen *calibrationScreen = nullptr;
-    ExplanationScreen *explanationScreen = nullptr;
+    IntroScreen        *introScreen       = nullptr;
+    CheckDevicesScreen *checkScreen       = nullptr;
+    MainMenu           *mainMenu          = nullptr;
+    CalibrationScreen  *calibrationScreen = nullptr;
+    ExplanationScreen  *explanationScreen = nullptr;
 
     bool debugMode = false;
 };

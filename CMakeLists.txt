@@ -26,15 +26,15 @@ set(PROJECT_SOURCES
     MainWindow.cpp MainWindow.hpp MainWindow.ui
     MainMenu.cpp MainMenu.hpp
     GameUI.cpp GameUI.hpp
-    Board.cpp Board.hpp
-    BoardDetector.cpp BoardDetector.hpp
-    Camera.cpp Camera.hpp
+
+
+
     CameraAi.cpp CameraAi.hpp
     Robot.cpp Robot.hpp
     StateMachine.cpp StateMachine.hpp
     Negamax.cpp Negamax.hpp
-    MonteCarlo.cpp MonteCarlo.hpp
-    MCTS.cpp MCTS.hpp
+
+
     TranspositionTable.cpp TranspositionTable.hpp
     IntroScreen.cpp IntroScreen.hpp
     CheckDevicesScreen.cpp CheckDevicesScreen.hpp

@@ -1,15 +1,15 @@
 #pragma once
 
 #include <QWidget>
+#include <QThread>
 #include <QLabel>
 #include <QPushButton>
-#include <QThread>
 #include <QGraphicsOpacityEffect>
-#include <QPropertyAnimation>
 
 class DeviceChecker : public QObject
 {
     Q_OBJECT
+
 public:
     explicit DeviceChecker(QObject *parent = nullptr);
     ~DeviceChecker();
@@ -18,7 +18,7 @@ signals:
     void statusUpdated(bool cameraOk, bool robotOk);
 
 public slots:
-    void checkDevices();  // Vérifie la caméra et le robot
+    void checkDevices();
 };
 
 class CheckDevicesScreen : public QWidget
@@ -42,15 +42,16 @@ private slots:
     void onContinueClicked();
 
 private:
-    QLabel *cameraIcon;
-    QLabel *robotIcon;
-    QLabel *cameraStatusLabel;
-    QLabel *robotStatusLabel;
-    QLabel *cameraStatusIcon;
-    QLabel *robotStatusIcon;
-    QPushButton *continueButton;
+    QLabel *cameraIcon = nullptr;
+    QLabel *robotIcon = nullptr;
+    QLabel *cameraStatusLabel = nullptr;
+    QLabel *robotStatusLabel = nullptr;
+    QLabel *cameraStatusIcon = nullptr;
+    QLabel *robotStatusIcon = nullptr;
+    QPushButton *continueButton = nullptr;
 
-    QGraphicsOpacityEffect *opacityEffect;
+    QGraphicsOpacityEffect *opacityEffect = nullptr;
+
     QThread checkerThread;
-    DeviceChecker *checker;
+    DeviceChecker *checker = nullptr;
 };
