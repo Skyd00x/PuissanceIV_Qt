@@ -6,7 +6,19 @@
 #include <QJsonObject>
 #include <QFile>
 #include <vector>
+#include <array>
 #include "Robot.hpp"
+
+// =============================
+//  Enum indexant tous les points
+// =============================
+enum class CalibPoint {
+    Left_1, Left_2, Left_3, Left_4,
+    Right_1, Right_2, Right_3, Right_4,
+    Grid_1, Grid_2, Grid_3, Grid_4, Grid_5, Grid_6, Grid_7,
+
+    Count // toujours dernier
+};
 
 struct CalibrationStep {
     QString text;
@@ -46,6 +58,18 @@ public:
     void saveCalibration(const QString& path);
     void loadCalibration(const QString& path);
 
+    // Accès direct par enum
+    Pose getPosition(CalibPoint p) const {
+        return calibratedPoints[(int)p];
+    }
+
+    // === Nouveaux helpers pour le jeu ===
+    // Position de prise d'un pion dans la réserve
+    Pose getPosePick() const;
+
+    // Position pour déposer dans une colonne de la grille (0..6)
+    Pose getPoseForColumn(int col) const;
+
 signals:
     void connectionFinished(bool success);
     void robotReady();
@@ -56,13 +80,17 @@ signals:
 
 private:
     std::vector<Pose> interpolatePoints(const Pose& start, const Pose& end, int count);
-    void computeAllPositions();  // 🔹 génère tous les points calculés
+    void computeAllPositions();
 
 private:
     Robot* robot;
     bool connected;
     int stepIndex;
     bool gripperOpen;
+
     std::vector<CalibrationStep> steps;
-    std::vector<CalibrationStepData> calibrationData;
+    std::vector<CalibrationStepData> calibrationData; // bruts des étapes manu
+
+    // Nouveau : tableau indexé par CalibPoint
+    std::array<Pose, (int)CalibPoint::Count> calibratedPoints;
 };

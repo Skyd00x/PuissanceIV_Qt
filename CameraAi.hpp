@@ -22,17 +22,22 @@ class CameraAI : public QObject
     Q_OBJECT
 
 public:
+    // --- Type réutilisable par d'autres classes ---
+    using Grid = QVector<QVector<int>>;
+
     explicit CameraAI(QObject* parent = nullptr);
     ~CameraAI();
 
     static bool isAvailable();
     void start(int camIndex = 0);
     void stop();
-    int getGrille(QVector<QVector<int>>& out) const;
+
+    // Retourne la grille détectée
+    int getGrille(Grid& out) const;
 
 signals:
     void frameReady(const QImage& img);
-    void gridUpdated(const QVector<QVector<int>>& g);
+    void gridUpdated(const Grid& g);
 
 private slots:
     void processLoop();
@@ -42,14 +47,15 @@ private:
     void updateGrid(const std::vector<Detection>& dets);
     QImage matToQImage(const cv::Mat& mat);
 
-    QThread        workerThread;
-    cv::VideoCapture cap;
-    bool           running = false;
+    QThread            workerThread;
+    cv::VideoCapture   cap;
+    bool               running = false;
     std::shared_ptr<torch::jit::Module> model;
 
     static constexpr int rows_ = 6;
     static constexpr int cols_ = 7;
-    mutable QMutex          gridMutex_;
-    QVector<QVector<int>>   grid_;
-    bool gridComplete_ = false;
+
+    mutable QMutex     gridMutex_;
+    Grid               grid_;          // ← Grille utilisant le type Grid
+    bool               gridComplete_ = false;
 };

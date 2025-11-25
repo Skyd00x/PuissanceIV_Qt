@@ -78,7 +78,7 @@ void CameraAI::stop()
     qDebug() << "[AI] 🛑 Capture arrêtée";
 }
 
-int CameraAI::getGrille(QVector<QVector<int>>& out) const
+int CameraAI::getGrille(Grid& out) const
 {
     QMutexLocker lock(&gridMutex_);
     if (!gridComplete_) return -1;
@@ -267,7 +267,6 @@ std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR)
 void CameraAI::updateGrid(const std::vector<Detection>& dets)
 {
     if ((int)dets.size() != rows_ * cols_) {
-        // Grille précédente conservée tant qu’on n’a pas une nouvelle grille complète
         return;
     }
 
@@ -276,9 +275,9 @@ void CameraAI::updateGrid(const std::vector<Detection>& dets)
     cells.reserve(dets.size());
 
     auto mapVal = [](int cls) {
-        if (cls == 2) return 0;  // empty
-        if (cls == 0) return 1;  // red
-        return 2;                // yellow
+        if (cls == 2) return 0;
+        if (cls == 0) return 1;
+        return 2;
     };
 
     for (const auto& d : dets) {
@@ -290,7 +289,7 @@ void CameraAI::updateGrid(const std::vector<Detection>& dets)
     std::sort(cells.begin(), cells.end(),
               [](auto& a, auto& b) { return a.cy < b.cy; });
 
-    QVector<QVector<int>> newGrid(rows_, QVector<int>(cols_, 0));
+    Grid newGrid(rows_, QVector<int>(cols_, 0));
     bool ok = true;
 
     for (int r = 0; r < rows_; ++r) {

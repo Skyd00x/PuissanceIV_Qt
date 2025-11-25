@@ -19,7 +19,7 @@
 #include <QShowEvent>
 #include <QFrame>
 
-#include "CalibrationLogic.hpp"   // adapte la casse au nom réel de ton fichier
+#include "CalibrationLogic.hpp"
 #include "Robot.hpp"
 
 class CalibrationScreen : public QWidget {
@@ -27,6 +27,9 @@ class CalibrationScreen : public QWidget {
 
 public:
     explicit CalibrationScreen(Robot* robot, QWidget* parent = nullptr);
+
+    // 👉 AJOUT : permet au MainWindow de récupérer la logique interne
+    CalibrationLogic* getCalibrationLogic() const { return logic; }
 
     void fadeIn();
     void fadeOut();
@@ -41,14 +44,12 @@ signals:
     void progressUpdated(int value);
 
 public slots:
-    // === Boutons ===
     void onStartClicked();
     void onNextClicked();
     void onBackClicked();
     void onTestClicked();
     void onRestartClicked();
 
-    // === Logique robot ===
     void attemptConnection();
     void onConnectionFinished(bool success);
     void onRobotReady();
@@ -59,9 +60,7 @@ protected:
     void showEvent(QShowEvent* event) override;
 
 private:
-    // Prépare l’UI d’intro (sans auto-connexion)
     void prepareIntroUI(const QString& message = QStringLiteral("Connexion au robot en cours..."));
-    // Affiche l’intro ; si autoConnect == true, lance (ou planifie) la connexion
     void showIntroLayout(bool autoConnect);
     void showCalibrationLayout();
     void showEndLayout();
@@ -74,28 +73,23 @@ private:
     CalibrationLogic* logic;
     int currentStep = -1;
 
-    // État de tentative de connexion en cours (évite les doubles appels)
     bool isConnecting = false;
 
-    // === Éléments communs ===
     QLabel* titleLabel;
     QProgressBar* progressBar;
     QPropertyAnimation* fadeAnimation;
     QStackedLayout* stackedLayout;
 
-    // === Layouts ===
     QWidget* introWidget;
     QWidget* calibrationWidget;
     QWidget* endWidget;
 
-    // === Intro ===
     QLabel* introLabel;
     QLabel* loadingLabel;
     QMovie* loadingMovie;
     QPushButton* startButton;
     QPushButton* retryButton;
 
-    // === Calibration ===
     QTextBrowser* instructionsView;
     QLabel* imageLabel;
     QPushButton* nextButton;
@@ -104,7 +98,6 @@ private:
     QPushButton* rotateLeftButton;
     QPushButton* rotateRightButton;
 
-    // === Fin ===
     QLabel* endLabel;
     QPushButton* testButton;
     QPushButton* restartButton;

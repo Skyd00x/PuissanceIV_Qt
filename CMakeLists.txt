@@ -25,7 +25,7 @@ set(PROJECT_SOURCES
     main.cpp
     MainWindow.cpp MainWindow.hpp MainWindow.ui
     MainMenu.cpp MainMenu.hpp
-    GameUI.cpp GameUI.hpp
+    GameScreen.cpp GameScreen.hpp
 
 
 
@@ -57,6 +57,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(PuissanceIV_QT
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
+        GameLogic.hpp GameLogic.cpp
     )
     qt_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
 else()

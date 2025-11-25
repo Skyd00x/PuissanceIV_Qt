@@ -7,7 +7,6 @@
 CalibrationLogic::CalibrationLogic(Robot* robot, QObject* parent)
     : QObject(parent), robot(robot), connected(false), stepIndex(0), gripperOpen(false)
 {
-    // === Définition des étapes UI ===
     steps = {
         { "Videz les réservoirs, sauf un pion dans le réservoir de gauche à l'emplacement 1.",
          "./Ressources/image/Calibration/Etape1.png", true, false, false, false, false, false, false },
@@ -28,7 +27,7 @@ CalibrationLogic::CalibrationLogic(Robot* robot, QObject* parent)
     };
 }
 
-// === Connexion / Initialisation ===
+// === Connexion au robot ===
 bool CalibrationLogic::connectToRobot() {
     if (!robot) return false;
     connected = robot->connect();
@@ -37,9 +36,10 @@ bool CalibrationLogic::connectToRobot() {
 }
 
 void CalibrationLogic::disconnectToRobot() {
-    if (robot)
+    if (robot) {
         robot->turnOffGripper();
         robot->disconnect();
+    }
     connected = false;
     gripperOpen = false;
 }
@@ -53,9 +53,10 @@ void CalibrationLogic::homeRobot() {
     }).detach();
 }
 
-// === Calibration ===
+// === Début de calibration ===
 void CalibrationLogic::startCalibration() {
     if (!connected) return;
+
     stepIndex = 0;
     calibrationData.clear();
     emit progressChanged(0);
@@ -64,6 +65,7 @@ void CalibrationLogic::startCalibration() {
         emit stepChanged(steps[0], 0);
 }
 
+// === Enregistrement intermédiaire ===
 void CalibrationLogic::recordStep(int index) {
     if (!connected || !robot) return;
 
@@ -74,128 +76,107 @@ void CalibrationLogic::recordStep(int index) {
     data.name = QString("Step_%1").arg(index + 1);
     data.pose = p;
 
-    if (index >= static_cast<int>(calibrationData.size()))
+    if (index >= (int)calibrationData.size())
         calibrationData.resize(index + 1);
 
     calibrationData[index] = data;
     emit progressChanged(index + 1);
 
-    // 🔹 Si toutes les étapes manuelles sont enregistrées, calculer les autres
-    if (index == 6) { // dernière étape manuelle
+    // Dernière étape manuelle = on calcule le reste
+    if (index == 6) {
         computeAllPositions();
         emit calibrationFinished();
     }
 
-    // Étape suivante (UI)
     stepIndex = index + 1;
-    if (stepIndex < static_cast<int>(steps.size()))
+    if (stepIndex < (int)steps.size())
         emit stepChanged(steps[stepIndex], stepIndex);
 }
 
 void CalibrationLogic::previousStep() {
     if (!connected) return;
+
     if (stepIndex <= 0) {
         stepIndex = 0;
-        if (!steps.empty())
-            emit stepChanged(steps[0], 0);
+        emit stepChanged(steps[0], 0);
         emit progressChanged(0);
         return;
     }
 
     stepIndex--;
     emit progressChanged(stepIndex);
-    if (stepIndex < static_cast<int>(steps.size()))
-        emit stepChanged(steps[stepIndex], stepIndex);
+    emit stepChanged(steps[stepIndex], stepIndex);
 }
 
 void CalibrationLogic::resetCalibration() {
     calibrationData.clear();
     stepIndex = 0;
     emit progressChanged(0);
+
     if (!steps.empty())
         emit stepChanged(steps[0], 0);
 }
 
-// === Calculs automatiques ===
+// === Interpolation ===
 std::vector<Pose> CalibrationLogic::interpolatePoints(const Pose& start, const Pose& end, int count) {
-    std::vector<Pose> points;
-    if (count < 2) return points;
+    std::vector<Pose> pts;
+    if (count < 2) return pts;
 
+    pts.reserve(count);
     for (int i = 0; i < count; ++i) {
-        float t = static_cast<float>(i) / (count - 1);
+        float t = float(i) / float(count - 1);
         Pose p;
         p.x = start.x + (end.x - start.x) * t;
         p.y = start.y + (end.y - start.y) * t;
         p.z = start.z + (end.z - start.z) * t;
         p.r = start.r + (end.r - start.r) * t;
-        points.push_back(p);
+        pts.push_back(p);
     }
-    return points;
+    return pts;
 }
 
+// ================================================
+//   Génération des 15 points calibrés
+// ================================================
 void CalibrationLogic::computeAllPositions() {
     if (calibrationData.size() < 7) return;
 
-    // 🔹 Sauvegarder les points de référence avant tout
-    Pose left1 = calibrationData[1].pose;
-    Pose left4 = calibrationData[2].pose;
+    Pose left1  = calibrationData[1].pose;
+    Pose left4  = calibrationData[2].pose;
     Pose right1 = calibrationData[3].pose;
     Pose right4 = calibrationData[4].pose;
-    Pose grid1 = calibrationData[5].pose;
-    Pose grid7 = calibrationData[6].pose;
+    Pose grid1  = calibrationData[5].pose;
+    Pose grid7  = calibrationData[6].pose;
 
-    // 🔹 Effacer et reconstruire proprement la liste complète
-    calibrationData.clear();
+    // 1️⃣ Réserve gauche
+    auto L = interpolatePoints(left1, left4, 4);
+    for (int i = 0; i < 4; i++)
+        calibratedPoints[(int)CalibPoint::Left_1 + i] = L[i];
 
-    // 1️⃣ Réservoir gauche (2 points → 4)
-    auto leftPoints = interpolatePoints(left1, left4, 4);
-    for (int i = 0; i < 4; ++i) {
-        CalibrationStepData d;
-        d.name = QString("Left_%1").arg(i + 1);
-        d.pose = leftPoints[i];
-        calibrationData.push_back(d);
-    }
+    // 2️⃣ Réserve droite
+    auto R = interpolatePoints(right1, right4, 4);
+    for (int i = 0; i < 4; i++)
+        calibratedPoints[(int)CalibPoint::Right_1 + i] = R[i];
 
-    // 2️⃣ Réservoir droit (2 points → 4)
-    auto rightPoints = interpolatePoints(right1, right4, 4);
-    for (int i = 0; i < 4; ++i) {
-        CalibrationStepData d;
-        d.name = QString("Right_%1").arg(i + 1);
-        d.pose = rightPoints[i];
-        calibrationData.push_back(d);
-    }
+    // 3️⃣ Colonnes de grille (7)
+    auto G = interpolatePoints(grid1, grid7, 7);
+    for (int i = 0; i < 7; i++)
+        calibratedPoints[(int)CalibPoint::Grid_1 + i] = G[i];
 
-    // 3️⃣ Grille (2 points → 7)
-    auto gridPoints = interpolatePoints(grid1, grid7, 7);
-    for (int i = 0; i < 7; ++i) {
-        CalibrationStepData d;
-        d.name = QString("Grid_%1").arg(i + 1);
-        d.pose = gridPoints[i];
-        calibrationData.push_back(d);
-    }
-
-    // 🔹 Sauvegarde automatique de la calibration complète
     saveCalibration("./calibration.json");
 }
 
 // === Test des positions ===
 void CalibrationLogic::testCalibration() {
-    if (!connected || calibrationData.empty()) return;
+    if (!connected) return;
 
     std::thread([this]() {
-        int total = static_cast<int>(calibrationData.size());
-        if (total == 0) return;
+        int total = (int)CalibPoint::Count;
 
-        qDebug() << "Nombre total de positions testées:" << total;
+        for (int i = 0; i < total; i++) {
+            robot->goToSecurized(calibratedPoints[i]);
 
-        for (int i = 0; i < total; ++i) {
-            robot->goToSecurized(calibrationData[i].pose);
-
-            // 🔹 Calcul précis du pourcentage (float → int)
-            double ratio = double(i + 1) / double(total);
-            int progress = std::clamp(static_cast<int>(ratio * 100.0), 0, 100);
-            qDebug() << "Progression:" << progress;
-
+            int progress = (i + 1) * 100 / total;
             QMetaObject::invokeMethod(this, [this, progress]() {
                 emit progressChanged(progress);
             }, Qt::QueuedConnection);
@@ -203,50 +184,42 @@ void CalibrationLogic::testCalibration() {
             std::this_thread::sleep_for(std::chrono::milliseconds(150));
         }
 
-
-        // Fin du test
         QMetaObject::invokeMethod(this, [this]() {
             emit calibrationTestFinished();
             emit progressChanged(100);
         }, Qt::QueuedConnection);
+
     }).detach();
 }
 
 // === Manipulations manuelles ===
 void CalibrationLogic::toggleGripper() {
     if (!connected || !robot) return;
-    if (gripperOpen)
-        robot->closeGripper();
-    else
-        robot->openGripper();
+    if (gripperOpen) robot->closeGripper();
+    else robot->openGripper();
     gripperOpen = !gripperOpen;
 }
 
-void CalibrationLogic::rotateLeft() {
-    if (!connected || !robot) return;
-    robot->rotate(+5);
-}
+void CalibrationLogic::rotateLeft()  { if (connected) robot->rotate(+5); }
+void CalibrationLogic::rotateRight() { if (connected) robot->rotate(-5); }
 
-void CalibrationLogic::rotateRight() {
-    if (!connected || !robot) return;
-    robot->rotate(-5);
-}
-
-// === Sauvegarde / Chargement ===
+// === Sauvegarde ===
 void CalibrationLogic::saveCalibration(const QString& path) {
     QJsonArray arr;
-    for (const auto& d : calibrationData) {
+
+    for (int i = 0; i < (int)CalibPoint::Count; i++) {
+        const Pose& p = calibratedPoints[i];
         QJsonObject o;
-        o["name"] = d.name;
-        o["x"] = d.pose.x;
-        o["y"] = d.pose.y;
-        o["z"] = d.pose.z;
-        o["r"] = d.pose.r;
+        o["index"] = i;
+        o["x"] = p.x;
+        o["y"] = p.y;
+        o["z"] = p.z;
+        o["r"] = p.r;
         arr.append(o);
     }
 
     QJsonObject root;
-    root["steps"] = arr;
+    root["points"] = arr;
 
     QFile f(path);
     if (f.open(QIODevice::WriteOnly)) {
@@ -255,6 +228,7 @@ void CalibrationLogic::saveCalibration(const QString& path) {
     }
 }
 
+// === Chargement ===
 void CalibrationLogic::loadCalibration(const QString& path) {
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly))
@@ -267,16 +241,35 @@ void CalibrationLogic::loadCalibration(const QString& path) {
     if (!doc.isObject())
         return;
 
-    QJsonArray arr = doc.object()["steps"].toArray();
-    calibrationData.clear();
-    for (const QJsonValue& v : arr) {
-        QJsonObject o = v.toObject();
-        CalibrationStepData d;
-        d.name = o["name"].toString();
-        d.pose.x = o["x"].toDouble();
-        d.pose.y = o["y"].toDouble();
-        d.pose.z = o["z"].toDouble();
-        d.pose.r = o["r"].toDouble();
-        calibrationData.push_back(d);
+    QJsonObject root = doc.object();
+
+    if (root.contains("points")) {
+        QJsonArray arr = root["points"].toArray();
+        for (const auto& v : arr) {
+            QJsonObject o = v.toObject();
+            int i = o["index"].toInt();
+            if (i >= 0 && i < (int)CalibPoint::Count) {
+                calibratedPoints[i].x = o["x"].toDouble();
+                calibratedPoints[i].y = o["y"].toDouble();
+                calibratedPoints[i].z = o["z"].toDouble();
+                calibratedPoints[i].r = o["r"].toDouble();
+            }
+        }
     }
+}
+
+// =====================================================
+//   Nouveaux helpers utilisés par GameLogic / Negamax
+// =====================================================
+Pose CalibrationLogic::getPosePick() const {
+    // On utilise par défaut le premier emplacement de la réserve gauche
+    // (Left_1). Tu pourras changer la logique si besoin (réserve droite, etc.).
+    return calibratedPoints[(int)CalibPoint::Left_1];
+}
+
+Pose CalibrationLogic::getPoseForColumn(int col) const {
+    // 7 colonnes : 0..6 → Grid_1..Grid_7
+    if (col < 0) col = 0;
+    if (col > 6) col = 6;
+    return calibratedPoints[(int)CalibPoint::Grid_1 + col];
 }

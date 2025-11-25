@@ -1,54 +1,27 @@
 #pragma once
 
-#include <thread>
-#include <iostream>
-#include "TranspositionTable.hpp"
+#include <QVector>
+#include "CameraAi.hpp"
 
-namespace Negamax
+namespace SimpleAI
 {
-    /*
+using Grid = CameraAI::Grid;
 
-	/// <summary>
-	/// Get the best move for the current player, using the negamax algorithm.
-	/// </summary>
-	/// <param name="board">Board to evaluate</param>
-	/// <param name="transpositionTable">Transposition table to use to store already evaluated boards</param>
-	/// <param name="depth">Depth of the search</param>
-	/// <returns>The index of the column to play the best move</returns>
-	int GetBestMove(Board board, TranspositionTable* transpositionTable, unsigned int depth);
+// Retourne la meilleure colonne à jouer
+int getBestMove(const Grid& grid, int depth);
 
+// Optionnel : évalue une grille
+int evaluate(const Grid& grid);
 
-	int GetBestMove_noThreads(Board board, TranspositionTable* transpositionTable, unsigned int depth);
+// Vérifie si un joueur gagne
+bool isWinningMove(const Grid& grid, int player);
 
-	/// <summary>
-	/// Evaluate a Terminal board by giving it a score corresponding to the number of pieces needed to win for the current player.
-	/// </summary>
-	/// <param name="board">Board to evaluate</param>
-	/// <returns>Score of the board</returns>
-	int Evaluate(Board terminalBoard);
+// Vérifie si un coup est jouable
+bool isValidMove(const Grid& grid, int col);
 
-	/// <summary>
-	/// Recursive function to find the best move for the current player.
-	/// </summary>
-	/// <param name="board">Board to evaluate</param>
-	/// <param name="alpha">Alpha-beta pruning parameter</param>
-	/// <param name="beta">Alpha-beta pruning parameter</param>
-	/// <param name="transpositionTable">Transposition table to use to store already evaluated boards</param>
-	/// <param name="depth">Depth of the search</param>
-	/// <returns>The score of the board</returns>
-	int Negamax(Board board, int alpha, int beta, TranspositionTable* transpositionTable, unsigned int depth);
+// Joue un coup dans une copie de la grille
+Grid playMove(const Grid& grid, int col, int player);
 
-	/// <summary>
-	/// Launche the threads running the negamax function. One thread is created for each column
-	/// </summary>
-	/// <param name="board">Board to evaluate</param>
-	/// <param name="result">Int array to store each column result from each thread</param>
-	/// <param name="transpositionTable"></param>
-	/// <param name="depth"></param>
-	void NegamaxThread(Board board, int* result, TranspositionTable* transpositionTable, unsigned int depth);
-
-	int compareColumnOrder(int a, int b);
-
-	int GetBestMoveEarlyGame(Board board);
-*/
+// Negamax avec élagage alpha-beta
+int negamax(const Grid& grid, int depth, int alpha, int beta, int player);
 }

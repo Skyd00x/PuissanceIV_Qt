@@ -1,277 +1,158 @@
 #include "Negamax.hpp"
-/*
+#include <algorithm>
 
-int columnOrder[7] = { 3, 2, 4, 1, 5, 0, 6 };
-
-int Negamax::GetBestMove(Board board, TranspositionTable* transpositionTable, unsigned int depth)
+namespace SimpleAI
 {
-	// Avoid instant loss
-	if (board.getMoveNumber() == 1)
-	{
-		return Negamax::GetBestMoveEarlyGame(board);
-	}
-
-	// Array to store the results of each column
-	int results[7];
-
-	// Initialize the results array
-	for (int i = 0; i < 7; i++)
-	{
-		results[i] = -1000;
-	}
-
-	// One thread for each column
-	std::thread columnThreads[7];
-
-	// Function to run Negamax in a thread
-	auto NegamaxThread = [&](int col) {
-		// Check if the move can be played in the column
-		if (board.isValidMove(col))
-		{
-			Board newBoard = board.copy();
-			newBoard.Play(col);
-
-			// Call Negamax function to evaluate the move
-			results[col] = Negamax::Negamax(newBoard, -100000, 100000, transpositionTable, depth - 1);
-			std::cout << "Move " << col << " value: " << results[col] << std::endl;
-		}
-	};
-
-	// Create threads for each column
-	for (int i = 0; i < 7; i++)
-	{
-		columnThreads[i] = std::thread(NegamaxThread, i);
-	}
-
-	// Join all threads
-	for (int i = 0; i < 7; i++)
-	{
-		if (columnThreads[i].joinable())
-		{
-			columnThreads[i].join();
-		}
-	}
-
-	// Print the results of each column
-	std::cout << "Results: ";
-	for (int i = 0; i < 7; i++)
-	{
-		std::cout << results[i] << " ";
-	}
-	std::cout << std::endl;
-
-	// Find the best move with the highest value
-	int bestMove = 0;
-	int bestValue = -1000;
-
-	for (int i = 0; i < 7; i++)
-	{
-		if (results[i] == bestValue)
-		{
-			bestMove = Negamax::compareColumnOrder(i, bestMove);
-		}
-		else if (results[i] > bestValue)
-		{
-			bestValue = results[i];
-			bestMove = i;
-		}
-	}
-
-	return bestMove;
+// ---------------------------------------------------------
+// Vérifie si la colonne est jouable
+// ---------------------------------------------------------
+bool isValidMove(const Grid& grid, int col)
+{
+    if (col < 0 || col >= 7) return false;
+    return (grid[0][col] == 0);
 }
 
-
-
-int Negamax::GetBestMove_noThreads(Board board, TranspositionTable* transpositionTable, unsigned int depth)
+// ---------------------------------------------------------
+// Joue un coup dans une copie de la grille
+// ---------------------------------------------------------
+Grid playMove(const Grid& grid, int col, int player)
 {
-	// Avoid instant loss
-	if (board.getMoveNumber() == 1)
-	{
-		return Negamax::GetBestMoveEarlyGame(board);
-	}
-
-	// Array to store the results of each column
-	int results[7];
-
-	// Initialize the results array
-	for (int i = 0; i < 7; i++)
-	{
-		results[i] = -1000;
-	}
-
-	// For each column, play the move and calculate the value of the move
-	for (int i = 0; i < 7; i++)
-	{
-		// Check if the move can be played in the column
-		if (board.isValidMove(i))
-		{
-			Board newBoard = board.copy();
-			newBoard.Play(i);
-
-			// Call the NegamaxThread function directly without multithreading
-			//NegamaxThread(newBoard, &results[i], transpositionTable, depth);
-			results[i] = Negamax::Negamax(newBoard, -100000, 100000, transpositionTable, depth - 1);
-
-			std::cout << "Move " << i << " value: " << results[i] << std::endl;
-		}
-	}
-
-	// Print the results of each column
-	std::cout << "Results: ";
-	for (int i = 0; i < 7; i++)
-	{
-		std::cout << results[i] << " ";
-	}
-	std::cout << std::endl;
-
-	int bestMove = 0;
-	int bestValue = -1000;
-
-	// Find the best move with the highest value
-	for (int i = 0; i < 7; i++)
-	{
-		if (results[i] == bestValue)
-		{
-			bestMove = Negamax::compareColumnOrder(i, bestMove);
-		}
-		else if (results[i] > bestValue)
-		{
-			bestValue = results[i];
-			bestMove = i;
-		}
-	}
-
-	return bestMove;
-
-
-
-	//int bestMove = 0;
-	//int bestValue = -1000;
-
-	//for (int i = 0; i < 7; i++)
-	//{
-	//	if (board.isValidMove(i))
-	//	{
-	//		Board newBoard = board.copy();
-	//		newBoard.Play(i);
-	//		int value = Negamax::Negamax(newBoard, -100000, 100000, transpositionTable, depth - 1);
-	//		std::cout << "Move " << i << " value: " << value << std::endl;
-	//		if (value > bestValue)
-	//		{
-	//			bestValue = value;
-	//			bestMove = i;
-	//		}
-	//	}
-	//}
-	//return bestMove;
-}
-
-int Negamax::Evaluate(Board terminalBoard)
-{
-	if (terminalBoard.playerWins())
-	{
-		return 43 - terminalBoard.getMoveNumber();
-	}
-	else if (terminalBoard.robotWins())
-	{
-		return 43 - terminalBoard.getMoveNumber();
-	}
-	else
-	{
-		return 0;
-	}
-}
-
-int Negamax::Negamax(Board board, int alpha, int beta, TranspositionTable* transpositionTable, unsigned int depth)
-{
-
-
-	if (depth == 0 || board.isTerminal())
-	{
-		int value = Negamax::Evaluate(board);
-		return value;
-	}
-	else
-	{
-		for (int i = 0; i < 7; i++)
-		{
-			if (board.isValidMove(i) && board.moveIsWinning(i))
-			{
-				if (board.getMoveNumber() % 2 == 0)
-				{
-					return -43 + board.getMoveNumber();
-				}
-				else
-				{
-					return 43 - board.getMoveNumber();
-				}
-			}
-		}
-
-		int value = -1000;
-		for (int i = 0; i < 7; i++)
-		{
-			if (board.isValidMove(i))
-			{
-				Board boardCopy = board.copy();
-				boardCopy.Play(i);
-				value = std::max(value, -Negamax::Negamax(boardCopy, -beta, -alpha, transpositionTable, depth - 1));
-				alpha = std::max(alpha, value);
-				if (alpha >= beta)
-				{
-					continue;
-				}
-			}
-		}
-
-		if (board.isTerminal())
-		{
-			transpositionTable->put(board, value);
+    Grid g = grid;
+    for (int r = 5; r >= 0; r--)
+    {
+        if (g[r][col] == 0)
+        {
+            g[r][col] = player;
+            break;
         }
-
-		return value;
-	}
+    }
+    return g;
 }
 
-void Negamax::NegamaxThread(Board board, int* result, TranspositionTable* transpositionTable, unsigned int depth)
+// ---------------------------------------------------------
+// Détection alignement de 4
+// ---------------------------------------------------------
+bool isWinningMove(const Grid& g, int player)
 {
-	*result = Negamax::Negamax(board, -100000, 100000, transpositionTable, depth);
+    // Horizontal
+    for (int r = 0; r < 6; r++)
+    {
+        for (int c = 0; c < 4; c++)
+        {
+            if (g[r][c] == player &&
+                g[r][c + 1] == player &&
+                g[r][c + 2] == player &&
+                g[r][c + 3] == player)
+                return true;
+        }
+    }
+
+    // Vertical
+    for (int c = 0; c < 7; c++)
+    {
+        for (int r = 0; r < 3; r++)
+        {
+            if (g[r][c] == player &&
+                g[r + 1][c] == player &&
+                g[r + 2][c] == player &&
+                g[r + 3][c] == player)
+                return true;
+        }
+    }
+
+    // Diagonale /
+    for (int r = 3; r < 6; r++)
+    {
+        for (int c = 0; c < 4; c++)
+        {
+            if (g[r][c] == player &&
+                g[r - 1][c + 1] == player &&
+                g[r - 2][c + 2] == player &&
+                g[r - 3][c + 3] == player)
+                return true;
+        }
+    }
+
+    // Diagonale
+    for (int r = 3; r < 6; r++)
+    {
+        for (int c = 3; c < 7; c++)
+        {
+            if (g[r][c] == player &&
+                g[r - 1][c - 1] == player &&
+                g[r - 2][c - 2] == player &&
+                g[r - 3][c - 3] == player)
+                return true;
+        }
+    }
+
+    return false;
 }
 
-int Negamax::compareColumnOrder(int a, int b)
+// ---------------------------------------------------------
+// Évaluation simple (plus rapide que la tienne)
+// ---------------------------------------------------------
+int evaluate(const Grid& grid)
 {
-	int aIndex = -1;
-	int bIndex = -1;
-	for (int i = 0; i < 7; i++)
-	{
-		if (columnOrder[i] == a)
-		{
-			aIndex = i;
-		}
-		if (columnOrder[i] == b)
-		{
-			bIndex = i;
-		}
-	}
-	if (aIndex < bIndex)
-	{
-		return columnOrder[aIndex];
-	}
-	else
-	{
-		return columnOrder[bIndex];
-	}
+    if (isWinningMove(grid, 2)) return +10000;  // robot gagne
+    if (isWinningMove(grid, 1)) return -10000;  // joueur gagne
+    return 0;
 }
 
-int Negamax::GetBestMoveEarlyGame(Board board)
+// ---------------------------------------------------------
+// Negamax récursif
+// player = 1 (humain) ou 2 (robot)
+// ---------------------------------------------------------
+int negamax(const Grid& grid, int depth, int alpha, int beta, int player)
 {
-	if (board.getPiece(3, 0) == 1)
-	{
-		return 2;
-	}
-	else
-	{
-		return 3;
-	}
+    int eval = evaluate(grid);
+    if (depth == 0 || eval != 0)
+        return (player == 2 ? eval : -eval);
+
+    int best = -999999;
+
+    for (int col = 0; col < 7; col++)
+    {
+        if (!isValidMove(grid, col))
+            continue;
+
+        Grid child = playMove(grid, col, player);
+
+        int score = -negamax(child, depth - 1, -beta, -alpha, (player == 2 ? 1 : 2));
+
+        best = std::max(best, score);
+        alpha = std::max(alpha, score);
+
+        if (alpha >= beta)
+            break;
+    }
+
+    return best;
 }
-*/
+
+// ---------------------------------------------------------
+// Recherche du meilleur coup
+// ---------------------------------------------------------
+int getBestMove(const Grid& grid, int depth)
+{
+    int bestCol = 3;      // centre par défaut
+    int bestVal = -999999;
+
+    for (int col = 0; col < 7; col++)
+    {
+        if (!isValidMove(grid, col))
+            continue;
+
+        Grid child = playMove(grid, col, 2); // robot = 2
+        int val = -negamax(child, depth - 1, -100000, 100000, 1);
+
+        if (val > bestVal)
+        {
+            bestVal = val;
+            bestCol = col;
+        }
+    }
+
+    return bestCol;
+}
+}
