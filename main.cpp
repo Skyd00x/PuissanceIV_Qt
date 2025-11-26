@@ -1,13 +1,20 @@
 #include "MainWindow.hpp"
+#include "Robot.hpp"
+#include "CalibrationLogic.hpp"
 #include <QMetaType>
+#include <QTimer>
+#include <QDebug>
+#include <thread>
+#include <chrono>
 
 // === DEBUG FLAGS ===
 #define DEBUG_VISIONAI     0
 #define DEBUG_INTRO        0
 #define DEBUG_CHECK        0
-#define DEBUG_MENU         1
+#define DEBUG_MENU         0
 #define DEBUG_GAME         0
 #define DEBUG_CALIBRATION  0
+#define DEBUG_ROBOT_TEST   1
 
 int main(int argc, char *argv[])
 {
@@ -103,6 +110,59 @@ int main(int argc, char *argv[])
     w.showCalibration();
     w.show();
     return app.exec();
+
+#elif DEBUG_ROBOT_TEST
+    // === MODE DEBUG TEST ROBOT ===
+    qDebug() << "[DEBUG_ROBOT_TEST] Démarrage du test des mouvements du robot";
+
+    Robot robot(nullptr);
+    CalibrationLogic calibLogic(&robot, nullptr);
+
+    // Connexion au robot
+    qDebug() << "[DEBUG_ROBOT_TEST] Connexion au robot...";
+    if (!calibLogic.connectToRobot()) {
+        qDebug() << "[DEBUG_ROBOT_TEST] ERREUR: Impossible de se connecter au robot!";
+        return 1;
+    }
+    qDebug() << "[DEBUG_ROBOT_TEST] Robot connecté avec succès";
+
+    // Remise à la position d'origine
+    qDebug() << "[DEBUG_ROBOT_TEST] Remise à la position d'origine...";
+    robot.Home();
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+
+    // Test des mouvements : pion i -> colonne i (pour i = 1 à 7)
+    for (int i = 0; i < 7; i++) {
+        qDebug() << QString("[DEBUG_ROBOT_TEST] === Test %1/7 : Pion %2 -> Colonne %3 ===").arg(i+1).arg(i+1).arg(i+1);
+
+        // Déterminer la position de réservoir (on alterne entre les 4 positions du réservoir gauche)
+        CalibPoint pickPoint = static_cast<CalibPoint>((int)CalibPoint::Left_1 + (i % 4));
+        qDebug() << QString("[DEBUG_ROBOT_TEST] Prendre pion à la position Left_%1").arg((i % 4) + 1);
+
+        // 1. Prendre le pion (utilise la nouvelle fonction de haut niveau)
+        calibLogic.pickPiece(pickPoint);
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+        qDebug() << QString("[DEBUG_ROBOT_TEST] Déposer pion dans colonne %1").arg(i + 1);
+
+        // 2. Lâcher le pion dans la colonne (utilise la nouvelle fonction de haut niveau)
+        calibLogic.dropPiece(i);
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+        qDebug() << QString("[DEBUG_ROBOT_TEST] Test %1/7 terminé").arg(i+1);
+    }
+
+    // Retour à la position d'origine
+    qDebug() << "[DEBUG_ROBOT_TEST] Retour à la position d'origine...";
+    robot.Home();
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+
+    // Déconnexion
+    qDebug() << "[DEBUG_ROBOT_TEST] Déconnexion du robot";
+    calibLogic.disconnectToRobot();
+
+    qDebug() << "[DEBUG_ROBOT_TEST] Test terminé avec succès!";
+    return 0;
 
 #else
     // === APPLICATION NORMALE ===

@@ -301,27 +301,7 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     connect(restartButton, &QPushButton::clicked, this, &CalibrationScreen::onRestartClicked);
 
     connect(menuButton, &QPushButton::clicked, this, [this]() {
-        // Reset logique & UI
-        logic->resetCalibration();
-        currentStep = 0;
-
-        progressBar->setRange(0, 7);
-        progressBar->setValue(0);
-        progressBar->hide();
-
-        loadingMovie->stop();
-        loadingLabel->hide();
-
-        // Déconnexion propre
-        logic->disconnectToRobot();
-
-        // Autoriser la prochaine tentative
-        isConnecting = false;
-
-        // Revenir à l’intro ; la connexion se relancera automatiquement au prochain affichage
-        prepareIntroUI("Connexion au robot en cours...");
-        showIntroLayout(false);
-
+        qDebug() << "[CalibrationScreen] Bouton menu cliqué - émission du signal backToMenuRequested";
         emit backToMenuRequested();
     });
 
@@ -401,6 +381,10 @@ void CalibrationScreen::onRobotReady() {
     introLabel->setText("Le robot est maintenant prêt.<br>"
                         "Les manipulations à effectuer seront affichées tout au long de la calibration.<br>"
                         "<br><em>La durée estimée est de 5 minutes.</em><br>");
+
+    // Réappliquer complètement le style du bouton pour s'assurer qu'il s'affiche correctement
+    styleButton(startButton);
+
     startButton->show();
     progressBar->hide();
 }

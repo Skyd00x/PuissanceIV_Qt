@@ -2,6 +2,7 @@
 #include <thread>
 #include <chrono>
 #include <QMetaObject>
+#include <QDebug>
 #include <cmath>
 
 CalibrationLogic::CalibrationLogic(Robot* robot, QObject* parent)
@@ -25,6 +26,9 @@ CalibrationLogic::CalibrationLogic(Robot* robot, QObject* parent)
         { "Calibration terminée.<br>Vous pouvez maintenant tester les positions, recommencer ou quitter.",
          "./Ressources/image/welcome_calibration.png", false, false, false, false, true, true, true }
     };
+
+    // Charger les positions calibrées si elles existent
+    loadCalibration("./calibration.json");
 }
 
 // === Connexion au robot ===
@@ -272,4 +276,59 @@ Pose CalibrationLogic::getPoseForColumn(int col) const {
     if (col < 0) col = 0;
     if (col > 6) col = 6;
     return calibratedPoints[(int)CalibPoint::Grid_1 + col];
+}
+
+// =====================================================
+//   Fonctions de haut niveau pour manipuler les pions
+// =====================================================
+
+void CalibrationLogic::pickPiece(CalibPoint reservoirPosition) {
+    if (!connected || !robot) return;
+
+    // Vérifier que la position est bien dans un réservoir
+    int posIndex = (int)reservoirPosition;
+    bool isLeftReservoir = (posIndex >= (int)CalibPoint::Left_1 && posIndex <= (int)CalibPoint::Left_4);
+    bool isRightReservoir = (posIndex >= (int)CalibPoint::Right_1 && posIndex <= (int)CalibPoint::Right_4);
+
+    if (!isLeftReservoir && !isRightReservoir) {
+        qDebug() << "[CalibrationLogic] ERREUR: pickPiece() requiert une position de réservoir (Left_1..4 ou Right_1..4)";
+        return;
+    }
+
+    // Récupérer la position calibrée
+    Pose pickPose = calibratedPoints[posIndex];
+
+    // Aller chercher le pion de manière sécurisée
+    robot->goToSecurized(pickPose);
+
+    // Fermer la pince pour attraper le pion
+    robot->closeGripper();
+
+    // Petite pause pour s'assurer que le pion est bien attrapé
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+}
+
+void CalibrationLogic::dropPiece(int column) {
+    if (!connected || !robot) return;
+
+    // Vérifier que la colonne est valide (0..6)
+    if (column < 0 || column > 6) {
+        qDebug() << "[CalibrationLogic] ERREUR: dropPiece() requiert une colonne entre 0 et 6";
+        return;
+    }
+
+    // Récupérer la position de la colonne
+    Pose dropPose = getPoseForColumn(column);
+
+    // Aller à la colonne de manière sécurisée
+    robot->goToSecurized(dropPose);
+
+    // Ouvrir la pince pour lâcher le pion
+    robot->openGripper();
+
+    // Petite pause pour s'assurer que le pion est bien lâché
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+    // Désactiver la pince (économie d'énergie et sécurité)
+    robot->turnOffGripper();
 }

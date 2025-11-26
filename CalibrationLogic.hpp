@@ -70,6 +70,13 @@ public:
     // Position pour déposer dans une colonne de la grille (0..6)
     Pose getPoseForColumn(int col) const;
 
+    // === Fonctions de haut niveau pour manipuler les pions ===
+    // Prendre un pion à une position de réservoir (Left_1..Left_4 ou Right_1..Right_4)
+    void pickPiece(CalibPoint reservoirPosition);
+
+    // Lâcher un pion dans une colonne de la grille (0..6)
+    void dropPiece(int column);
+
 signals:
     void connectionFinished(bool success);
     void robotReady();
