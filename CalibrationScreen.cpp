@@ -12,6 +12,9 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     pal.setColor(QPalette::Window, Qt::white);
     setPalette(pal);
 
+    // === WIDGET PRINCIPAL (contient tout sauf confirmation) ===
+    mainWidget = new QWidget(this);
+
     // === TITRE ===
     titleLabel = new QLabel("Calibration du robot", this);
     titleLabel->setAlignment(Qt::AlignCenter);
@@ -185,9 +188,36 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         stackedLayout->addWidget(endWidget);
     }
 
-    // === LAYOUT GLOBAL ===
+    // === BOUTON QUITTER ===
+    quitButton = new QPushButton("← Quitter", mainWidget);
+    quitButton->setFixedSize(160, 55);
+    quitButton->setStyleSheet(
+        "QPushButton { background-color: #E0E0E0; color: #1B3B5F;"
+        " font-size: 22px; font-weight: bold; border-radius: 27px; }"
+        "QPushButton:hover { background-color: #D0D0D0; }"
+        "QPushButton:pressed { background-color: #A8A8A8; }"
+        );
+    quitButton->setCursor(Qt::PointingHandCursor);
+    connect(quitButton, &QPushButton::clicked, this, &CalibrationScreen::showConfirmationScreen);
+
+    auto *shadowQuit = new QGraphicsDropShadowEffect;
+    shadowQuit->setBlurRadius(20);
+    shadowQuit->setOffset(3, 3);
+    shadowQuit->setColor(QColor(0, 0, 0, 80));
+    quitButton->setGraphicsEffect(shadowQuit);
+
+    // === LAYOUT GLOBAL DU MAIN WIDGET ===
     {
-        QVBoxLayout* mainLayout = new QVBoxLayout(this);
+        QVBoxLayout* mainLayout = new QVBoxLayout(mainWidget);
+        mainLayout->setContentsMargins(0, 0, 0, 0);
+
+        // Layout du header avec bouton quitter
+        QHBoxLayout* headerLayout = new QHBoxLayout;
+        headerLayout->setContentsMargins(20, 20, 20, 0);
+        headerLayout->addWidget(quitButton, 0, Qt::AlignLeft | Qt::AlignTop);
+        headerLayout->addStretch();
+
+        mainLayout->addLayout(headerLayout);
         mainLayout->addWidget(titleLabel, 0, Qt::AlignCenter);
         mainLayout->addSpacing(10);
         mainLayout->addWidget(progressBar, 0, Qt::AlignHCenter);
@@ -296,6 +326,20 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     });
 
     connect(retryButton, &QPushButton::clicked, this, &CalibrationScreen::attemptConnection);
+
+    // === CRÉATION DU WIDGET DE CONFIRMATION ===
+    createConfirmWidget();
+
+    // === STACK GLOBAL (mainWidget + confirmWidget) ===
+    mainStack = new QStackedWidget(this);
+    mainStack->addWidget(mainWidget);
+    mainStack->addWidget(confirmWidget);
+    mainStack->setCurrentWidget(mainWidget);
+
+    QVBoxLayout* globalLayout = new QVBoxLayout(this);
+    globalLayout->setContentsMargins(0, 0, 0, 0);
+    globalLayout->addWidget(mainStack);
+    setLayout(globalLayout);
 
     // === DÉMARRAGE ===
     prepareIntroUI("Connexion au robot en cours...");
@@ -513,4 +557,105 @@ void CalibrationScreen::applyRoundedImageEffect(QLabel *label, const QString &im
 
     label->setPixmap(scaled);
     label->setStyleSheet("background: transparent; border: none;");
+}
+
+// === CRÉATION DU WIDGET DE CONFIRMATION ===
+void CalibrationScreen::createConfirmWidget() {
+    confirmWidget = new QWidget(this);
+    QVBoxLayout *outerLayout = new QVBoxLayout(confirmWidget);
+    outerLayout->setContentsMargins(80, 80, 80, 80);
+    outerLayout->setSpacing(0);
+
+    QVBoxLayout *centerLayout = new QVBoxLayout;
+    centerLayout->setSpacing(50);
+
+    QLabel *title = new QLabel("Confirmation");
+    title->setAlignment(Qt::AlignCenter);
+    title->setStyleSheet("font-size: 60px; font-weight: bold; color: #1B3B5F;");
+
+    QLabel *confirmLabel = new QLabel("Voulez-vous vraiment quitter la calibration ?<br>Les modifications en cours seront perdues.");
+    confirmLabel->setAlignment(Qt::AlignCenter);
+    confirmLabel->setStyleSheet("font-size: 30px; color: #333; padding: 40px 30px;");
+    confirmLabel->setWordWrap(true);
+    confirmLabel->setMinimumHeight(150);
+
+    QPushButton *yesButton = new QPushButton("Oui");
+    QPushButton *noButton = new QPushButton("Non");
+
+    QList<QPushButton*> buttons = {yesButton, noButton};
+    QList<QString> colors = {"#2ECC71", "#E74C3C"};
+
+    for (int i = 0; i < buttons.size(); ++i) {
+        buttons[i]->setFixedSize(200, 70);
+        buttons[i]->setStyleSheet(QString(
+                                      "QPushButton { background-color: %1; color: white; font-size: 24px; font-weight: bold; border-radius: 35px; }"
+                                      "QPushButton:hover { background-color: #444; }"
+                                      "QPushButton:pressed { background-color: #111; }"
+                                      ).arg(colors[i]));
+        buttons[i]->setCursor(Qt::PointingHandCursor);
+    }
+
+    connect(noButton, &QPushButton::clicked, this, &CalibrationScreen::returnToCalibration);
+    connect(yesButton, &QPushButton::clicked, this, &CalibrationScreen::onQuitButtonClicked);
+
+    QHBoxLayout *buttonLayout = new QHBoxLayout;
+    buttonLayout->addStretch();
+    buttonLayout->addWidget(yesButton);
+    buttonLayout->addSpacing(40);
+    buttonLayout->addWidget(noButton);
+    buttonLayout->addStretch();
+
+    centerLayout->addWidget(title, 0, Qt::AlignCenter);
+    centerLayout->addWidget(confirmLabel, 0, Qt::AlignCenter);
+    centerLayout->addLayout(buttonLayout);
+
+    outerLayout->addStretch();
+    outerLayout->addLayout(centerLayout);
+    outerLayout->addStretch();
+}
+
+// === NAVIGATION VERS CONFIRMATION ===
+void CalibrationScreen::showConfirmationScreen() {
+    mainStack->setCurrentWidget(confirmWidget);
+}
+
+void CalibrationScreen::returnToCalibration() {
+    mainStack->setCurrentWidget(mainWidget);
+}
+
+void CalibrationScreen::onQuitButtonClicked() {
+    qDebug() << "[CalibrationScreen] Bouton Oui cliqué - émission du signal backToMenuRequested";
+    // Remettre sur le widget principal avant de quitter
+    mainStack->setCurrentWidget(mainWidget);
+    // Émettre le signal pour retourner au menu
+    emit backToMenuRequested();
+    qDebug() << "[CalibrationScreen] Signal backToMenuRequested émis";
+}
+
+// === RESET COMPLET DE LA CALIBRATION (méthode publique) ===
+void CalibrationScreen::resetCalibration() {
+    // Reset logique
+    logic->resetCalibration();
+    currentStep = 0;
+
+    // Reset UI
+    progressBar->setRange(0, 7);
+    progressBar->setValue(0);
+    progressBar->hide();
+
+    loadingMovie->stop();
+    loadingLabel->hide();
+
+    // Déconnexion propre
+    logic->disconnectToRobot();
+
+    // Autoriser la prochaine tentative
+    isConnecting = false;
+
+    // Revenir à l'intro
+    prepareIntroUI("Connexion au robot en cours...");
+    showIntroLayout(false);
+
+    // Retourner au widget principal (seulement si on reste sur calibration)
+    mainStack->setCurrentWidget(mainWidget);
 }

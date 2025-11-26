@@ -1,6 +1,7 @@
 #include "MainWindow.hpp"
 #include <QCloseEvent>
 #include <QDebug>
+#include <QTimer>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -14,7 +15,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // === OBJETS MOTEUR ===
     robot     = new Robot(this);
-    cameraAI  = new CameraAI(this);
+    cameraAI  = new CameraAI();  // Pas de parent pour permettre moveToThread()
 
     // === ÉCRANS UI ===
     introScreen       = new IntroScreen(this);
@@ -45,8 +46,10 @@ MainWindow::MainWindow(QWidget *parent)
         );
 
     // === CONNEXIONS GAME SCREEN ↔ GAME LOGIC ===
-    connect(gameScreen, &GameScreen::quitRequested,
-            gameLogic, &GameLogic::stopGame);
+    connect(gameScreen, &GameScreen::quitRequested, this, [this]() {
+        gameLogic->stopGame();
+        showMenu();
+    });
 
     connect(gameScreen, &GameScreen::countdownFinished,
             gameLogic, &GameLogic::startGame);
@@ -76,14 +79,54 @@ MainWindow::MainWindow(QWidget *parent)
     connect(mainMenu, &MainMenu::startCalibration,
             this, &MainWindow::showCalibration);
 
+    connect(mainMenu, &MainMenu::openExplanation,
+            this, &MainWindow::showExplanation);
+
     connect(mainMenu, &MainMenu::quitGame,
             this, &MainWindow::close);
 
+    // === CONNEXIONS CALIBRATION ===
+    connect(calibrationScreen, &CalibrationScreen::backToMenuRequested, this, [this]() {
+        qDebug() << "[MainWindow] Signal backToMenuRequested reçu";
+        // Ne pas faire le reset maintenant, il sera fait au prochain affichage
+        showMenu();
+        qDebug() << "[MainWindow] Affichage du menu principal effectué";
+
+        // Reset après avoir changé d'écran (en asynchrone)
+        QTimer::singleShot(100, [this]() {
+            qDebug() << "[MainWindow] Début du reset de la calibration";
+            calibrationScreen->resetCalibration();
+            qDebug() << "[MainWindow] Reset de la calibration terminé";
+        });
+    });
+
+    // === CONNEXIONS EXPLANATION ===
+    connect(explanationScreen, &ExplanationScreen::backToMenu,
+            this, &MainWindow::showMenu);
+
+    // === CONNEXIONS INTRO → CHECK → MENU ===
+    connect(introScreen, &IntroScreen::introFinished, this, [this]() {
+        showCheck();
+        checkScreen->startChecking();
+    });
+
+    connect(checkScreen, &CheckDevicesScreen::readyToContinue, this, [this]() {
+        showMenu();
+    });
+
     // === DÉMARRAGE PAR L'INTRO ===
-    showIntro();
+    // Géré dans main.cpp pour respecter les modes debug
 }
 
-MainWindow::~MainWindow() {}
+MainWindow::~MainWindow()
+{
+    // Nettoyage de CameraAI qui n'a pas de parent
+    if (cameraAI) {
+        cameraAI->stop();
+        delete cameraAI;
+        cameraAI = nullptr;
+    }
+}
 
 void MainWindow::setDebugMode(bool enabled)
 {
@@ -97,6 +140,7 @@ void MainWindow::setDebugMode(bool enabled)
 void MainWindow::showIntro()
 {
     stack->setCurrentWidget(introScreen);
+    introScreen->start();
 }
 
 void MainWindow::showCheck()
@@ -106,6 +150,7 @@ void MainWindow::showCheck()
 
 void MainWindow::showMenu()
 {
+    mainMenu->resetToMainMenu();  // Reset le menu au principal
     stack->setCurrentWidget(mainMenu);
 }
 
@@ -114,9 +159,15 @@ void MainWindow::showCalibration()
     stack->setCurrentWidget(calibrationScreen);
 }
 
+void MainWindow::showExplanation()
+{
+    stack->setCurrentWidget(explanationScreen);
+}
+
 void MainWindow::showGame()
 {
     stack->setCurrentWidget(gameScreen);
+    gameScreen->startGame();
 }
 
 // =====================================================

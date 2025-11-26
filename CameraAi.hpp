@@ -29,6 +29,7 @@ public:
     ~CameraAI();
 
     static bool isAvailable();
+    void loadModel();  // Charge le modèle TorchScript
     void start(int camIndex = 0);
     void stop();
 
@@ -43,6 +44,7 @@ private slots:
     void processLoop();
 
 private:
+    void initializeCamera(int camIndex);  // Initialise et démarre dans le workerThread
     std::vector<Detection> inferTorch(const cv::Mat& frame);
     void updateGrid(const std::vector<Detection>& dets);
     QImage matToQImage(const cv::Mat& mat);

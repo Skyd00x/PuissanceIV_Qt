@@ -17,9 +17,17 @@ CameraAI::CameraAI(QObject* parent)
     grid_(rows_, QVector<int>(cols_, 0)),
     gridComplete_(false)
 {
-    connect(&workerThread, &QThread::started, this, &CameraAI::processLoop);
+    // Déplace cet objet dans le workerThread
+    // IMPORTANT: ne fonctionne que si parent == nullptr
     moveToThread(&workerThread);
+}
 
+CameraAI::~CameraAI() {
+    stop();
+}
+
+void CameraAI::loadModel()
+{
     QString modelPath = QCoreApplication::applicationDirPath() + "/Model/best7.torchscript";
     qDebug() << "[AI] Chargement du modèle :" << modelPath;
 
@@ -39,10 +47,6 @@ CameraAI::CameraAI(QObject* parent)
     }
 }
 
-CameraAI::~CameraAI() {
-    stop();
-}
-
 bool CameraAI::isAvailable()
 {
     cv::VideoCapture testCap(0, cv::CAP_DSHOW);
@@ -53,14 +57,43 @@ bool CameraAI::isAvailable()
 
 void CameraAI::start(int camIndex)
 {
-    if (!cap.open(camIndex, cv::CAP_DSHOW)) {
-        qWarning() << "[AI] ❌ Impossible d'ouvrir la caméra (index:" << camIndex << ")";
-        return;
+    running = true;
+
+    if (!workerThread.isRunning()) {
+        // Connecte une seule fois au démarrage du thread
+        connect(&workerThread, &QThread::started, this, [this, camIndex]() {
+            initializeCamera(camIndex);
+        }, Qt::DirectConnection);
+
+        workerThread.start();
+    } else {
+        // Thread déjà démarré, lance l'initialisation directement
+        QMetaObject::invokeMethod(this, [this, camIndex]() {
+            initializeCamera(camIndex);
+        }, Qt::QueuedConnection);
+    }
+}
+
+void CameraAI::initializeCamera(int camIndex)
+{
+    // Cette méthode s'exécute dans le workerThread
+
+    // Charge le modèle si pas encore fait
+    if (!model) {
+        qDebug() << "[AI] Chargement du modèle dans le workerThread...";
+        loadModel();
     }
 
-    running = true;
-    workerThread.start();
+    // Ouvre la caméra
+    if (!cap.open(camIndex, cv::CAP_DSHOW)) {
+        qWarning() << "[AI] ❌ Impossible d'ouvrir la caméra (index:" << camIndex << ")";
+        running = false;
+        return;
+    }
     qDebug() << "[AI] 🚀 Capture démarrée";
+
+    // Démarre la boucle de traitement
+    processLoop();
 }
 
 void CameraAI::stop()

@@ -1,18 +1,21 @@
 #include "MainWindow.hpp"
+#include <QMetaType>
 
 // === DEBUG FLAGS ===
 #define DEBUG_VISIONAI     0
 #define DEBUG_INTRO        0
 #define DEBUG_CHECK        0
-#define DEBUG_MENU         0
+#define DEBUG_MENU         1
 #define DEBUG_GAME         0
 #define DEBUG_CALIBRATION  0
 
 int main(int argc, char *argv[])
 {
-#if DEBUG_VISIONAI
-
     QApplication app(argc, argv);
+    qRegisterMetaType<QImage>("QImage");
+
+#if DEBUG_VISIONAI
+    // === MODE DEBUG VISION AI ===
     QLabel label;
     label.show();
 
@@ -52,25 +55,33 @@ int main(int argc, char *argv[])
 
     return app.exec();
 
-#else
-    // === APPLICATION COMPLÈTE ===
-
-    QApplication app(argc, argv);
+#elif DEBUG_INTRO
+    // === MODE DEBUG INTRO ===
     MainWindow w;
-
-#if DEBUG_INTRO
     w.setDebugMode(true);
     w.showIntro();
+    w.show();
+    return app.exec();
 
 #elif DEBUG_CHECK
+    // === MODE DEBUG CHECK ===
+    MainWindow w;
     w.setDebugMode(true);
     w.showCheck();
+    w.show();
+    return app.exec();
 
 #elif DEBUG_MENU
+    // === MODE DEBUG MENU ===
+    MainWindow w;
     w.setDebugMode(true);
     w.showMenu();
+    w.show();
+    return app.exec();
 
 #elif DEBUG_GAME
+    // === MODE DEBUG GAME ===
+    MainWindow w;
     w.setDebugMode(true);
 
     // CHOIX DE LA DIFFICULTÉ POUR LE MODE DEBUG
@@ -82,15 +93,21 @@ int main(int argc, char *argv[])
     // StateMachine::Impossible
 
     w.showGame();
+    w.show();
+    return app.exec();
 
 #elif DEBUG_CALIBRATION
+    // === MODE DEBUG CALIBRATION ===
+    MainWindow w;
     w.setDebugMode(true);
     w.showCalibration();
+    w.show();
+    return app.exec();
 
 #else
+    // === APPLICATION NORMALE ===
+    MainWindow w;
     w.showIntro();
-#endif
-
     w.show();
     return app.exec();
 #endif

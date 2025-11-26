@@ -7,6 +7,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGraphicsDropShadowEffect>
+#include <QStackedWidget>
 
 class GameScreen : public QWidget
 {
@@ -14,6 +15,8 @@ class GameScreen : public QWidget
 
 public:
     explicit GameScreen(QWidget *parent = nullptr);
+
+    void startGame();  // Lance le countdown et prépare le jeu
 
     // Slots pour GameLogic
 public slots:
@@ -30,11 +33,23 @@ signals:
 private slots:
     void updateCountdown();
     void updateChronometer();
+    void onQuitButtonClicked();
+    void showConfirmationScreen();
+    void returnToGame();
 
 private:
     void startCountdown();
+    void createGameWidget();
+    void createConfirmWidget();
 
 private:
+    QStackedWidget *stack;
+
+    // Widgets
+    QWidget *gameWidget;
+    QWidget *confirmWidget;
+
+    // Éléments du jeu
     QPushButton *quitButton;
 
     QLabel *titleLabel;          // Partie en mode X
@@ -45,6 +60,7 @@ private:
     QTimer chronometer;
     int elapsedSeconds = 0;
 
+    QLabel *countdownTextLabel;  // Texte "Lancement de la partie dans"
     QLabel *countdownLabel;      // Compte à rebours (3,2,1)
     QTimer countdownTimer;
     int countdownValue = 3;

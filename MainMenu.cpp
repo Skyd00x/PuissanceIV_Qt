@@ -364,3 +364,13 @@ void MainMenu::showConfirmationMenu(const QString &text, ConfirmationType type)
     currentConfirm = type;
     animateTransition(stack->currentWidget(), confirmWidget, true);
 }
+
+// ============================================================
+// RÉINITIALISATION DU MENU
+// ============================================================
+void MainMenu::resetToMainMenu()
+{
+    // Retourne directement au menu principal sans animation
+    stack->setCurrentWidget(mainMenuWidget);
+    currentConfirm = ConfirmationType::None;
+}

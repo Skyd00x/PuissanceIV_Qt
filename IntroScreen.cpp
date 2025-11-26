@@ -124,16 +124,7 @@ IntroScreen::IntroScreen(QWidget *parent)
     holdTimer = new QTimer(this);
     holdTimer->setSingleShot(true);
 
-    // Séquence d’animation :
-    // 1 seconde de noir
-    // 2 secondes de fade-in
-    // 7,5 secondes d’affichage complet
-    // 2 secondes de fade-out
-    // 1 seconde de noir avant fermeture
-    QTimer::singleShot(1000, this, [this]() {
-        fadeInAnim->start();
-    });
-
+    // Configuration des connexions pour la séquence d'animation
     connect(fadeInAnim, &QPropertyAnimation::finished, this, [this]() {
         holdTimer->start(8500);
     });
@@ -152,6 +143,13 @@ IntroScreen::IntroScreen(QWidget *parent)
 
 void IntroScreen::start()
 {
-    // Affiche le widget et lance la séquence d’intro
-    show();
+    // Lance la séquence d'animation :
+    // 1 seconde de noir
+    // 2 secondes de fade-in
+    // 7,5 secondes d'affichage complet
+    // 2 secondes de fade-out
+    // 1 seconde de noir avant fermeture
+    QTimer::singleShot(1000, this, [this]() {
+        fadeInAnim->start();
+    });
 }

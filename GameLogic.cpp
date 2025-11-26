@@ -25,7 +25,8 @@ GameLogic::GameLogic(CameraAI* cam,
 
     // Frame vers view
     connect(camera, &CameraAI::frameReady,
-            this, &GameLogic::sendFrameToScreen);
+            this, &GameLogic::sendFrameToScreen,
+            Qt::QueuedConnection);
 
     // Grille mise à jour
     connect(camera, &CameraAI::gridUpdated,

@@ -30,6 +30,7 @@ public:
     void showCheck();
     void showMenu();
     void showCalibration();
+    void showExplanation();
     void showGame();        // ← ajouté
 
 protected:

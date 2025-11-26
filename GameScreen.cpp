@@ -12,8 +12,35 @@ GameScreen::GameScreen(QWidget *parent)
     pal.setColor(QPalette::Window, Qt::white);
     setPalette(pal);
 
+    // === STACK PRINCIPAL ===
+    stack = new QStackedWidget(this);
+    createGameWidget();
+    createConfirmWidget();
+
+    stack->addWidget(gameWidget);
+    stack->addWidget(confirmWidget);
+    stack->setCurrentWidget(gameWidget);
+
+    // === LAYOUT GLOBAL ===
+    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
+    mainLayout->addWidget(stack);
+    setLayout(mainLayout);
+
+    // === CONNEXIONS TIMERS ===
+    connect(&chronometer, &QTimer::timeout, this, &GameScreen::updateChronometer);
+    connect(&countdownTimer, &QTimer::timeout, this, &GameScreen::updateCountdown);
+}
+
+// ============================================================
+// CRÉATION DU WIDGET DE JEU
+// ============================================================
+void GameScreen::createGameWidget()
+{
+    gameWidget = new QWidget(this);
+
     // ============================
-    //  BOUTON QUITTER (Q1 STYLE)
+    //  BOUTON QUITTER
     // ============================
     quitButton = new QPushButton("← Quitter");
     quitButton->setFixedSize(160, 55);
@@ -24,7 +51,7 @@ GameScreen::GameScreen(QWidget *parent)
         "QPushButton:pressed { background-color: #A8A8A8; }"
         );
     quitButton->setCursor(Qt::PointingHandCursor);
-    connect(quitButton, &QPushButton::clicked, this, &GameScreen::quitRequested);
+    connect(quitButton, &QPushButton::clicked, this, &GameScreen::showConfirmationScreen);
 
     // Ombre
     auto *shadowQuit = new QGraphicsDropShadowEffect;
@@ -48,9 +75,6 @@ GameScreen::GameScreen(QWidget *parent)
     timerLabel->setStyleSheet("font-size: 35px; font-weight: bold; color: #1B3B5F;");
     timerLabel->setFixedWidth(150);
 
-    // Chronomètre logique
-    connect(&chronometer, &QTimer::timeout, this, &GameScreen::updateChronometer);
-
     // ============================
     //   SOUS-TITRE (tour joueur/robot)
     // ============================
@@ -69,12 +93,27 @@ GameScreen::GameScreen(QWidget *parent)
     // ============================
     //   COMPTE À REBOURS
     // ============================
+    countdownTextLabel = new QLabel("Lancement de la partie dans");
+    countdownTextLabel->setAlignment(Qt::AlignCenter);
+    countdownTextLabel->setStyleSheet("font-size: 45px; font-weight: bold; color: #1B3B5F;");
+    countdownTextLabel->hide();
+
     countdownLabel = new QLabel("3");
     countdownLabel->setAlignment(Qt::AlignCenter);
     countdownLabel->setStyleSheet("font-size: 120px; font-weight: bold; color: #1B3B5F;");
     countdownLabel->hide();
 
-    connect(&countdownTimer, &QTimer::timeout, this, &GameScreen::updateCountdown);
+    // Layout pour le countdown centré
+    QVBoxLayout *countdownLayout = new QVBoxLayout;
+    countdownLayout->addStretch();
+    countdownLayout->addWidget(countdownTextLabel, 0, Qt::AlignCenter);
+    countdownLayout->addSpacing(20);
+    countdownLayout->addWidget(countdownLabel, 0, Qt::AlignCenter);
+    countdownLayout->addStretch();
+
+    // Widget pour le countdown (pour le centrage absolu)
+    QWidget *countdownWidget = new QWidget;
+    countdownWidget->setLayout(countdownLayout);
 
     // ============================
     //   LAYOUT TOP
@@ -86,23 +125,108 @@ GameScreen::GameScreen(QWidget *parent)
     topBar->addWidget(timerLabel, 0, Qt::AlignRight | Qt::AlignTop);
 
     // ============================
-    //   LAYOUT GLOBAL
+    //   LAYOUT GLOBAL DU WIDGET
     // ============================
-    QVBoxLayout *main = new QVBoxLayout(this);
+    QVBoxLayout *main = new QVBoxLayout(gameWidget);
     main->setContentsMargins(20, 20, 20, 20);
     main->setSpacing(20);
 
     main->addLayout(topBar);
     main->addWidget(turnLabel);
     main->addWidget(cameraLabel, 1);
-    main->addWidget(countdownLabel, 0, Qt::AlignCenter);  // temporaire pendant countdown
+    main->addWidget(countdownWidget, 1);
     main->addStretch();
 
-    setLayout(main);
+    // ============================
+    //   INITIALISATION : tout est caché
+    // ============================
+    quitButton->hide();
+    titleLabel->hide();
+    timerLabel->hide();
+    turnLabel->hide();
+    cameraLabel->hide();
+    countdownTextLabel->hide();
+    countdownLabel->hide();
+}
 
-    // ============================
-    //   DÉMARRER LE COUNTDOWN
-    // ============================
+// ============================================================
+// CRÉATION DU WIDGET DE CONFIRMATION
+// ============================================================
+void GameScreen::createConfirmWidget()
+{
+    confirmWidget = new QWidget(this);
+    QVBoxLayout *outerLayout = new QVBoxLayout(confirmWidget);
+    outerLayout->setContentsMargins(80, 80, 80, 80);
+    outerLayout->setSpacing(0);
+
+    QVBoxLayout *centerLayout = new QVBoxLayout;
+    centerLayout->setSpacing(50);
+
+    QLabel *title = new QLabel("Confirmation");
+    title->setAlignment(Qt::AlignCenter);
+    title->setStyleSheet("font-size: 60px; font-weight: bold; color: #1B3B5F;");
+
+    QLabel *confirmLabel = new QLabel("Voulez-vous vraiment quitter la partie en cours ?");
+    confirmLabel->setAlignment(Qt::AlignCenter);
+    confirmLabel->setStyleSheet("font-size: 30px; color: #333; padding: 40px 30px;");
+    confirmLabel->setWordWrap(true);
+    confirmLabel->setMinimumHeight(150);
+
+    QPushButton *yesButton = new QPushButton("Oui");
+    QPushButton *noButton = new QPushButton("Non");
+
+    QList<QPushButton*> buttons = {yesButton, noButton};
+    QList<QString> colors = {"#2ECC71", "#E74C3C"};
+
+    for (int i = 0; i < buttons.size(); ++i) {
+        buttons[i]->setFixedSize(200, 70);
+        buttons[i]->setStyleSheet(QString(
+                                      "QPushButton { background-color: %1; color: white; font-size: 24px; font-weight: bold; border-radius: 35px; }"
+                                      "QPushButton:hover { background-color: #444; }"
+                                      "QPushButton:pressed { background-color: #111; }"
+                                      ).arg(colors[i]));
+        buttons[i]->setCursor(Qt::PointingHandCursor);
+    }
+
+    connect(noButton, &QPushButton::clicked, this, &GameScreen::returnToGame);
+    connect(yesButton, &QPushButton::clicked, this, &GameScreen::onQuitButtonClicked);
+
+    QHBoxLayout *buttonLayout = new QHBoxLayout;
+    buttonLayout->addStretch();
+    buttonLayout->addWidget(yesButton);
+    buttonLayout->addSpacing(40);
+    buttonLayout->addWidget(noButton);
+    buttonLayout->addStretch();
+
+    centerLayout->addWidget(title, 0, Qt::AlignCenter);
+    centerLayout->addWidget(confirmLabel, 0, Qt::AlignCenter);
+    centerLayout->addLayout(buttonLayout);
+
+    outerLayout->addStretch();
+    outerLayout->addLayout(centerLayout);
+    outerLayout->addStretch();
+}
+
+// ============================================================
+// DÉMARRAGE DU JEU (à appeler quand on affiche GameScreen)
+// ============================================================
+void GameScreen::startGame()
+{
+    // Retour au widget de jeu
+    stack->setCurrentWidget(gameWidget);
+
+    // Réinitialiser le chronomètre
+    elapsedSeconds = 0;
+    timerLabel->setText("00:00");
+
+    // Tout est caché pendant le countdown
+    quitButton->hide();
+    titleLabel->hide();
+    timerLabel->hide();
+    turnLabel->hide();
+    cameraLabel->hide();
+
+    // Lancer le countdown
     startCountdown();
 }
 
@@ -112,10 +236,10 @@ GameScreen::GameScreen(QWidget *parent)
 void GameScreen::startCountdown()
 {
     countdownValue = 3;
+    countdownTextLabel->show();
     countdownLabel->setText("3");
     countdownLabel->show();
 
-quartz:
     countdownTimer.start(1000);
 }
 
@@ -127,9 +251,18 @@ void GameScreen::updateCountdown()
         countdownLabel->setText("GO !");
         countdownTimer.stop();
         QTimer::singleShot(800, [this]() {
+            // Cacher le countdown et afficher l'interface de jeu
+            countdownTextLabel->hide();
             countdownLabel->hide();
-            emit countdownFinished();
+            quitButton->show();
+            titleLabel->show();
+            timerLabel->show();
+            turnLabel->show();
+            cameraLabel->show();
+
+            // Démarrer le chronomètre et la partie
             chronometer.start(1000);
+            emit countdownFinished();
         });
     }
     else
@@ -192,4 +325,22 @@ void GameScreen::showEndOfGame(const QString &winnerText, int totalSeconds)
 
     turnLabel->setText(final);
     turnLabel->setStyleSheet("font-size: 40px; font-weight: bold; color: #1B3B5F;");
+}
+
+// ============================================================
+//   NAVIGATION ENTRE ÉCRANS
+// ============================================================
+void GameScreen::showConfirmationScreen()
+{
+    stack->setCurrentWidget(confirmWidget);
+}
+
+void GameScreen::returnToGame()
+{
+    stack->setCurrentWidget(gameWidget);
+}
+
+void GameScreen::onQuitButtonClicked()
+{
+    emit quitRequested();
 }

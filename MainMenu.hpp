@@ -17,6 +17,8 @@ class MainMenu : public QWidget
 public:
     explicit MainMenu(QWidget *parent = nullptr);
 
+    void resetToMainMenu();  // Retourne au menu principal
+
 signals:
     void startGame(StateMachine::Difficulty difficulty);
     void startCalibration();
