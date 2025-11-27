@@ -48,8 +48,16 @@ MainWindow::MainWindow(QWidget *parent)
     // === CONNEXIONS GAME SCREEN ↔ GAME LOGIC ===
     connect(gameScreen, &GameScreen::quitRequested, this, [this]() {
         gameLogic->stopGame();
+        gameScreen->resetGame();  // Reset complet de l'écran de jeu
+
+        // Réinitialiser l'état de connexion du robot pour refaire Home() à la prochaine partie
+        gameLogic->resetRobotConnection();
+
         showMenu();
     });
+
+    connect(gameScreen, &GameScreen::prepareGame,
+            gameLogic, &GameLogic::prepareGame);
 
     connect(gameScreen, &GameScreen::countdownFinished,
             gameLogic, &GameLogic::startGame);
@@ -60,6 +68,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(gameLogic, &GameLogic::turnRobot,
             gameScreen, &GameScreen::setTurnRobot);
 
+    connect(gameLogic, &GameLogic::robotStatus,
+            gameScreen, &GameScreen::setRobotStatus);
+
     connect(gameLogic, &GameLogic::difficultyText,
             gameScreen, &GameScreen::setDifficultyText);
 
@@ -69,10 +80,43 @@ MainWindow::MainWindow(QWidget *parent)
     connect(gameLogic, &GameLogic::endOfGame,
             gameScreen, &GameScreen::showEndOfGame);
 
+    connect(cameraAI, &CameraAI::gridIncomplete, this, [this](int detectedCount) {
+        // Ne pas afficher l'overlay de grille incomplète si on attend le remplissage des réservoirs
+        if (!gameScreen->isReservoirOverlayVisible()) {
+            gameScreen->showGridIncompleteWarning(detectedCount);
+        }
+    }, Qt::QueuedConnection);
+
+    connect(cameraAI, &CameraAI::gridComplete, this, [this]() {
+        gameScreen->resetAllOverlays();
+    }, Qt::QueuedConnection);
+
+    connect(gameLogic, &GameLogic::robotInitializing,
+            gameScreen, &GameScreen::showRobotInitializing);
+
+    connect(gameLogic, &GameLogic::robotInitialized,
+            gameScreen, &GameScreen::hideRobotInitializing);
+
+    connect(gameLogic, &GameLogic::robotInitialized,
+            gameScreen, &GameScreen::startCountdownWhenReady);
+
+    connect(gameLogic, &GameLogic::cheatDetected,
+            gameScreen, &GameScreen::showCheatDetected);
+
+    connect(gameLogic, &GameLogic::reservoirEmpty,
+            gameScreen, &GameScreen::showReservoirEmpty);
+
+    connect(gameScreen, &GameScreen::reservoirsRefilled,
+            gameLogic, &GameLogic::onReservoirsRefilled);
+
+    connect(gameLogic, &GameLogic::gameResult,
+            gameScreen, &GameScreen::showGameResult);
+
     // === CONNEXIONS DU MENU ===
     connect(mainMenu, &MainMenu::startGame,
-            [&](StateMachine::Difficulty diff){
+            [&](StateMachine::Difficulty diff, StateMachine::PlayerColor color){
                 stateMachine.setDifficulty(diff);
+                stateMachine.setPlayerColor(color);
                 showGame();
             });
 
@@ -88,11 +132,21 @@ MainWindow::MainWindow(QWidget *parent)
     // === CONNEXIONS CALIBRATION ===
     connect(calibrationScreen, &CalibrationScreen::backToMenuRequested, this, [this]() {
         qDebug() << "[MainWindow] Signal backToMenuRequested reçu";
-        // Ne pas faire le reset maintenant, il sera fait au prochain affichage
+
+        // IMPORTANT : Déconnecter le robot IMMÉDIATEMENT pour éviter les conflits
+        // lors du prochain lancement de partie
+        qDebug() << "[MainWindow] Déconnexion du robot...";
+        calibrationScreen->getCalibrationLogic()->disconnectToRobot();
+        qDebug() << "[MainWindow] Robot déconnecté";
+
+        // Informer GameLogic que le robot a été déconnecté
+        gameLogic->resetRobotConnection();
+        qDebug() << "[MainWindow] État de connexion réinitialisé dans GameLogic";
+
         showMenu();
         qDebug() << "[MainWindow] Affichage du menu principal effectué";
 
-        // Reset après avoir changé d'écran (en asynchrone)
+        // Reset UI après avoir changé d'écran (en asynchrone)
         QTimer::singleShot(100, [this]() {
             qDebug() << "[MainWindow] Début du reset de la calibration";
             calibrationScreen->resetCalibration();

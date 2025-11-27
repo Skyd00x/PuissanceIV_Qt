@@ -49,14 +49,20 @@ bool Robot::isAvailable()
 // ============================================================================
 void Robot::Home()
 {
+    qDebug() << "[Robot] ==== DÉBUT Home() ====";
     HOMECmd homeCmd = {0};
     uint64_t idx = 0;
 
+    qDebug() << "[Robot] Appel SetQueuedCmdClear()...";
     SetQueuedCmdClear();
+    qDebug() << "[Robot] Appel SetQueuedCmdStartExec()...";
     SetQueuedCmdStartExec();
+    qDebug() << "[Robot] Appel SetHOMECmd() - Cette commande peut faire plusieurs mouvements physiques";
     SetHOMECmd(&homeCmd, true, &idx);
 
+    qDebug() << "[Robot] Attente de la fin du mouvement (idx=" << idx << ")...";
     waitForCompletion(idx);
+    qDebug() << "[Robot] ==== FIN Home() ====";
 }
 
 // ============================================================================
@@ -78,22 +84,32 @@ void Robot::goTo(Pose p)
 
 void Robot::goToSecurized(Pose target)
 {
+    // === SYSTÈME DE POINTS DE PASSAGE POUR ÉVITER LES COLLISIONS ===
+    // 1. Monter à z=150 (position de sécurité)
+    // 2. Se déplacer horizontalement à z=150
+    // 3. Descendre à la position cible
+
     // Récupère la pose actuelle
     Pose current;
     GetPose(&current);
 
-    // Étape 1 : remonter pour éviter les collisions
-    Pose zSafe = current;
-    zSafe.z = std::min(current.z + 100.0f, 150.0f);
-    goTo(zSafe);
+    // Étape 1 : Monter à z=150 avec la position actuelle (x, y)
+    qDebug() << "[Robot] Étape 1/3 : Montée à z=150 (sécurité)";
+    Pose stepUp = current;
+    stepUp.z = 150.0f;
+    goTo(stepUp);
 
-    // Étape 2 : se positionner au-dessus de la cible
-    Pose targetSafe = target;
-    targetSafe.z = std::min(target.z + 50.0f, 150.0f);
-    goTo(targetSafe);
+    // Étape 2 : Se déplacer horizontalement au-dessus de la cible à z=150
+    qDebug() << "[Robot] Étape 2/3 : Déplacement horizontal vers (x=" << target.x << ", y=" << target.y << ", z=150)";
+    Pose stepOver = target;
+    stepOver.z = 150.0f;
+    goTo(stepOver);
 
-    // Étape 3 : descente finale
+    // Étape 3 : Descendre à la position cible finale
+    qDebug() << "[Robot] Étape 3/3 : Descente à z=" << target.z;
     goTo(target);
+
+    qDebug() << "[Robot] Déplacement sécurisé terminé";
 }
 
 void Robot::rotate(float delta)

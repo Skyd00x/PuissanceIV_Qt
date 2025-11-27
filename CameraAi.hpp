@@ -39,6 +39,8 @@ public:
 signals:
     void frameReady(const QImage& img);
     void gridUpdated(const Grid& g);
+    void gridIncomplete(int detectedCount);  // Émis quand la grille n'est pas complète (pas 42 pions)
+    void gridComplete();  // Émis quand la grille devient complète
 
 private slots:
     void processLoop();
@@ -60,4 +62,5 @@ private:
     mutable QMutex     gridMutex_;
     Grid               grid_;          // ← Grille utilisant le type Grid
     bool               gridComplete_ = false;
+    int                incompleteCount_ = 0;  // Compteur de détections incomplètes consécutives
 };

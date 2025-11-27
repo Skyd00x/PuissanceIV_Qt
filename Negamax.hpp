@@ -8,7 +8,8 @@ namespace SimpleAI
 using Grid = CameraAI::Grid;
 
 // Retourne la meilleure colonne à jouer
-int getBestMove(const Grid& grid, int depth);
+// robotPlayer: 1 pour rouge, 2 pour jaune (par défaut 2)
+int getBestMove(const Grid& grid, int depth, int robotPlayer = 2);
 
 // Optionnel : évalue une grille
 int evaluate(const Grid& grid);

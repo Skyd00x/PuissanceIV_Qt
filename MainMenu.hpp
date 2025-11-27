@@ -20,7 +20,7 @@ public:
     void resetToMainMenu();  // Retourne au menu principal
 
 signals:
-    void startGame(StateMachine::Difficulty difficulty);
+    void startGame(StateMachine::Difficulty difficulty, StateMachine::PlayerColor color);
     void startCalibration();
     void openExplanation();
     void quitGame();
@@ -29,12 +29,15 @@ private:
     // ⚙️ Définir l'enum AVANT toute fonction qui l'utilise
     enum class ConfirmationType { None, StartGame, Calibration, Quit };
     StateMachine::Difficulty selectedDifficulty = StateMachine::Difficulty::Easy;
+    StateMachine::PlayerColor selectedColor = StateMachine::PlayerColor::Red;
     ConfirmationType currentConfirm = ConfirmationType::None;
 
 private slots:
     void showDifficultyMenu();
+    void showColorMenu();
     void showMainMenu();
     void onDifficultySelected();
+    void onColorSelected();
     void showConfirmationMenu(const QString &text, ConfirmationType type);
 
 private:
@@ -43,6 +46,7 @@ private:
     // Écrans
     QWidget *mainMenuWidget;
     QWidget *difficultyWidget;
+    QWidget *colorWidget;
     QWidget *confirmWidget;
 
     // Bouton aide
@@ -59,7 +63,12 @@ private:
     QPushButton *diffNormal;
     QPushButton *diffHard;
     QPushButton *diffImpossible;
-    QPushButton *backButton;
+    QPushButton *backButtonDiff;
+
+    // Choix de couleur
+    QPushButton *colorRed;
+    QPushButton *colorYellow;
+    QPushButton *backButtonColor;
 
     // Confirmation
     QLabel *confirmLabel;
@@ -67,6 +76,7 @@ private:
     // Méthodes internes
     void createMainMenu();
     void createDifficultyMenu();
+    void createColorMenu();
     void createConfirmationMenu();
     void animateTransition(QWidget *from, QWidget *to, bool forward);
 

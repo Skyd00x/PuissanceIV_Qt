@@ -14,7 +14,7 @@
 #define DEBUG_MENU         0
 #define DEBUG_GAME         0
 #define DEBUG_CALIBRATION  0
-#define DEBUG_ROBOT_TEST   1
+#define DEBUG_ROBOT_TEST   0
 
 int main(int argc, char *argv[])
 {
@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
     MainWindow w;
     w.setDebugMode(true);
     w.showIntro();
-    w.show();
+    w.showFullScreen();
     return app.exec();
 
 #elif DEBUG_CHECK
@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
     MainWindow w;
     w.setDebugMode(true);
     w.showCheck();
-    w.show();
+    w.showFullScreen();
     return app.exec();
 
 #elif DEBUG_MENU
@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
     MainWindow w;
     w.setDebugMode(true);
     w.showMenu();
-    w.show();
+    w.showFullScreen();
     return app.exec();
 
 #elif DEBUG_GAME
@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
     // StateMachine::Impossible
 
     w.showGame();
-    w.show();
+    w.showFullScreen();
     return app.exec();
 
 #elif DEBUG_CALIBRATION
@@ -108,7 +108,7 @@ int main(int argc, char *argv[])
     MainWindow w;
     w.setDebugMode(true);
     w.showCalibration();
-    w.show();
+    w.showFullScreen();
     return app.exec();
 
 #elif DEBUG_ROBOT_TEST
@@ -131,25 +131,33 @@ int main(int argc, char *argv[])
     robot.Home();
     std::this_thread::sleep_for(std::chrono::seconds(3));
 
-    // Test des mouvements : pion i -> colonne i (pour i = 1 à 7)
-    for (int i = 0; i < 7; i++) {
-        qDebug() << QString("[DEBUG_ROBOT_TEST] === Test %1/7 : Pion %2 -> Colonne %3 ===").arg(i+1).arg(i+1).arg(i+1);
+    // Test des mouvements : épuise réservoir gauche (4 pions) puis réservoir droit (4 pions)
+    for (int i = 0; i < 8; i++) {
+        qDebug() << QString("[DEBUG_ROBOT_TEST] === Test %1/8 ===").arg(i+1);
 
-        // Déterminer la position de réservoir (on alterne entre les 4 positions du réservoir gauche)
-        CalibPoint pickPoint = static_cast<CalibPoint>((int)CalibPoint::Left_1 + (i % 4));
-        qDebug() << QString("[DEBUG_ROBOT_TEST] Prendre pion à la position Left_%1").arg((i % 4) + 1);
+        // Déterminer la position de réservoir
+        CalibPoint pickPoint;
+        if (i < 4) {
+            // Réservoir gauche (Left_1 à Left_4)
+            pickPoint = static_cast<CalibPoint>((int)CalibPoint::Left_1 + i);
+            qDebug() << QString("[DEBUG_ROBOT_TEST] Prendre pion à la position Left_%1").arg(i + 1);
+        } else {
+            // Réservoir droit (Right_1 à Right_4)
+            pickPoint = static_cast<CalibPoint>((int)CalibPoint::Right_1 + (i - 4));
+            qDebug() << QString("[DEBUG_ROBOT_TEST] Prendre pion à la position Right_%1").arg((i - 4) + 1);
+        }
 
         // 1. Prendre le pion (utilise la nouvelle fonction de haut niveau)
         calibLogic.pickPiece(pickPoint);
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-        qDebug() << QString("[DEBUG_ROBOT_TEST] Déposer pion dans colonne %1").arg(i + 1);
-
-        // 2. Lâcher le pion dans la colonne (utilise la nouvelle fonction de haut niveau)
-        calibLogic.dropPiece(i);
+        // 2. Déposer dans une colonne (on fait le tour des colonnes 0-6, puis revient à 0)
+        int column = i % 7;
+        qDebug() << QString("[DEBUG_ROBOT_TEST] Déposer pion dans colonne %1").arg(column + 1);
+        calibLogic.dropPiece(column);
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-        qDebug() << QString("[DEBUG_ROBOT_TEST] Test %1/7 terminé").arg(i+1);
+        qDebug() << QString("[DEBUG_ROBOT_TEST] Test %1/8 terminé").arg(i+1);
     }
 
     // Retour à la position d'origine
@@ -168,7 +176,7 @@ int main(int argc, char *argv[])
     // === APPLICATION NORMALE ===
     MainWindow w;
     w.showIntro();
-    w.show();
+    w.showFullScreen();  // Démarrage en plein écran
     return app.exec();
 #endif
 }

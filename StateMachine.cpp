@@ -5,6 +5,7 @@ StateMachine::StateMachine()
 {
     state = State::MainMenu;
     difficulty = Difficulty::Medium;
+    playerColor = PlayerColor::Red;  // Par défaut, le joueur joue avec les rouges
 }
 
 void StateMachine::ChangeState(State newState)
@@ -54,6 +55,12 @@ void StateMachine::setDifficulty(Difficulty newDifficulty)
     }
 
     std::cout << "Difficulty changed to " << newDifficulty << std::endl;
+}
+
+void StateMachine::setPlayerColor(PlayerColor newColor)
+{
+    playerColor = newColor;
+    std::cout << "Player color changed to " << (newColor == PlayerColor::Red ? "Red" : "Yellow") << std::endl;
 }
 
 float StateMachine::getParam1() const { return Param1; }

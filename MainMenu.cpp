@@ -24,10 +24,12 @@ MainMenu::MainMenu(QWidget *parent)
     stack = new QStackedWidget(this);
     createMainMenu();
     createDifficultyMenu();
+    createColorMenu();
     createConfirmationMenu();
 
     stack->addWidget(mainMenuWidget);
     stack->addWidget(difficultyWidget);
+    stack->addWidget(colorWidget);
     stack->addWidget(confirmWidget);
     stack->setCurrentWidget(mainMenuWidget);
 
@@ -172,16 +174,16 @@ void MainMenu::createDifficultyMenu()
     layout->setContentsMargins(60, 30, 60, 30);
     layout->setSpacing(20);
 
-    backButton = new QPushButton("← Retour");
-    backButton->setFixedSize(160, 55);
-    backButton->setStyleSheet(
+    backButtonDiff = new QPushButton("← Retour");
+    backButtonDiff->setFixedSize(160, 55);
+    backButtonDiff->setStyleSheet(
         "QPushButton { background-color: #E0E0E0; color: #1B3B5F;"
         " font-size: 22px; font-weight: bold; border-radius: 27px; }"
         "QPushButton:hover { background-color: #D0D0D0; }"
         "QPushButton:pressed { background-color: #A8A8A8; }"
         );
-    backButton->setCursor(Qt::PointingHandCursor);
-    connect(backButton, &QPushButton::clicked, this, &MainMenu::showMainMenu);
+    backButtonDiff->setCursor(Qt::PointingHandCursor);
+    connect(backButtonDiff, &QPushButton::clicked, this, &MainMenu::showMainMenu);
 
     QLabel *title = new QLabel("Choisissez la difficulté");
     title->setAlignment(Qt::AlignCenter);
@@ -210,11 +212,66 @@ void MainMenu::createDifficultyMenu()
         connect(diffButtons[i], &QPushButton::clicked, this, &MainMenu::onDifficultySelected);
     }
 
-    layout->addWidget(backButton, 0, Qt::AlignLeft);
+    layout->addWidget(backButtonDiff, 0, Qt::AlignLeft);
     layout->addSpacing(20);
     layout->addWidget(title, 0, Qt::AlignCenter);
     layout->addSpacing(40);
     for (auto *b : diffButtons)
+        layout->addWidget(b, 0, Qt::AlignCenter);
+    layout->addStretch();
+}
+
+// ============================================================
+// MENU DE SÉLECTION DE COULEUR
+// ============================================================
+void MainMenu::createColorMenu()
+{
+    colorWidget = new QWidget(this);
+    QVBoxLayout *layout = new QVBoxLayout(colorWidget);
+    layout->setContentsMargins(60, 30, 60, 30);
+    layout->setSpacing(20);
+
+    backButtonColor = new QPushButton("← Retour");
+    backButtonColor->setFixedSize(160, 55);
+    backButtonColor->setStyleSheet(
+        "QPushButton { background-color: #E0E0E0; color: #1B3B5F;"
+        " font-size: 22px; font-weight: bold; border-radius: 27px; }"
+        "QPushButton:hover { background-color: #D0D0D0; }"
+        "QPushButton:pressed { background-color: #A8A8A8; }"
+        );
+    backButtonColor->setCursor(Qt::PointingHandCursor);
+    connect(backButtonColor, &QPushButton::clicked, this, &MainMenu::showDifficultyMenu);
+
+    QLabel *title = new QLabel("Choisissez votre couleur");
+    title->setAlignment(Qt::AlignCenter);
+    title->setStyleSheet("font-size: 60px; font-weight: bold; color: #1B3B5F;");
+
+    const int buttonWidth = 400;
+    const int buttonHeight = 90;
+
+    colorRed = new QPushButton("Pion Rouge");
+    colorYellow = new QPushButton("Pion Jaune");
+
+    QList<QPushButton*> colorButtons = {colorRed, colorYellow};
+    QList<QString> colors = {"#B22222", "#EFCB00"};
+
+    for (int i = 0; i < colorButtons.size(); ++i) {
+        colorButtons[i]->setFixedSize(buttonWidth, buttonHeight);
+        colorButtons[i]->setStyleSheet(QString(
+                                          "QPushButton { background-color: %1; color: white; font-size: 28px; font-weight: bold; border-radius: 45px; }"
+                                          "QPushButton:hover { background-color: #333333; }"
+                                          "QPushButton:pressed { background-color: #111111; }"
+                                          ).arg(colors[i]));
+        colorButtons[i]->setCursor(Qt::PointingHandCursor);
+
+        connect(colorButtons[i], &QPushButton::clicked, this, &MainMenu::onColorSelected);
+    }
+
+    layout->addWidget(backButtonColor, 0, Qt::AlignLeft);
+    layout->addSpacing(20);
+    layout->addWidget(title, 0, Qt::AlignCenter);
+    layout->addSpacing(40);
+    for (auto *b : colorButtons)
         layout->addWidget(b, 0, Qt::AlignCenter);
     layout->addStretch();
 }
@@ -259,7 +316,7 @@ void MainMenu::createConfirmationMenu()
     connect(noButton, &QPushButton::clicked, this, &MainMenu::showMainMenu);
     connect(yesButton, &QPushButton::clicked, [this]() {
         if (currentConfirm == ConfirmationType::StartGame)
-            emit startGame(selectedDifficulty);
+            emit startGame(selectedDifficulty, selectedColor);
         else if (currentConfirm == ConfirmationType::Calibration)
             emit startCalibration();
         else if (currentConfirm == ConfirmationType::Quit)
@@ -340,6 +397,23 @@ void MainMenu::onDifficultySelected()
     else
         selectedDifficulty = StateMachine::Difficulty::Easy;
 
+    // Aller vers le choix de couleur au lieu de la confirmation
+    showColorMenu();
+}
+
+// ============================================================
+// CHOIX DE COULEUR
+// ============================================================
+void MainMenu::onColorSelected()
+{
+    QPushButton *btn = qobject_cast<QPushButton*>(sender());
+    if (!btn) return;
+
+    if (btn == colorYellow)
+        selectedColor = StateMachine::PlayerColor::Yellow;
+    else
+        selectedColor = StateMachine::PlayerColor::Red;
+
     QString diffName;
     switch (selectedDifficulty) {
     case StateMachine::Difficulty::Easy: diffName = "Facile"; break;
@@ -348,14 +422,17 @@ void MainMenu::onDifficultySelected()
     case StateMachine::Difficulty::Impossible: diffName = "Impossible"; break;
     }
 
-    showConfirmationMenu(QString("Voulez-vous démarrer une partie en mode %1 ?").arg(diffName),
+    QString colorName = (selectedColor == StateMachine::PlayerColor::Red) ? "Rouge" : "Jaune";
+
+    showConfirmationMenu(QString("Voulez-vous démarrer une partie en mode %1 avec les pions %2 ?").arg(diffName).arg(colorName),
                          ConfirmationType::StartGame);
 }
 
 // ============================================================
 // AFFICHAGE DES MENUS
 // ============================================================
-void MainMenu::showDifficultyMenu() { animateTransition(mainMenuWidget, difficultyWidget, true); }
+void MainMenu::showDifficultyMenu() { animateTransition(stack->currentWidget(), difficultyWidget, true); }
+void MainMenu::showColorMenu() { animateTransition(stack->currentWidget(), colorWidget, true); }
 void MainMenu::showMainMenu() { animateTransition(stack->currentWidget(), mainMenuWidget, false); }
 
 void MainMenu::showConfirmationMenu(const QString &text, ConfirmationType type)

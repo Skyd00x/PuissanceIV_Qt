@@ -133,18 +133,19 @@ int negamax(const Grid& grid, int depth, int alpha, int beta, int player)
 // ---------------------------------------------------------
 // Recherche du meilleur coup
 // ---------------------------------------------------------
-int getBestMove(const Grid& grid, int depth)
+int getBestMove(const Grid& grid, int depth, int robotPlayer)
 {
     int bestCol = 3;      // centre par défaut
     int bestVal = -999999;
+    int humanPlayer = (robotPlayer == 1) ? 2 : 1;  // Adversaire du robot
 
     for (int col = 0; col < 7; col++)
     {
         if (!isValidMove(grid, col))
             continue;
 
-        Grid child = playMove(grid, col, 2); // robot = 2
-        int val = -negamax(child, depth - 1, -100000, 100000, 1);
+        Grid child = playMove(grid, col, robotPlayer);
+        int val = -negamax(child, depth - 1, -100000, 100000, humanPlayer);
 
         if (val > bestVal)
         {

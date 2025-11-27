@@ -30,6 +30,12 @@ GameScreen::GameScreen(QWidget *parent)
     // === CONNEXIONS TIMERS ===
     connect(&chronometer, &QTimer::timeout, this, &GameScreen::updateChronometer);
     connect(&countdownTimer, &QTimer::timeout, this, &GameScreen::updateCountdown);
+
+    // Timer pour activer les avertissements de grille après un délai
+    gridWarningDelayTimer.setSingleShot(true);
+    connect(&gridWarningDelayTimer, &QTimer::timeout, [this]() {
+        allowGridWarning = true;
+    });
 }
 
 // ============================================================
@@ -102,6 +108,216 @@ void GameScreen::createGameWidget()
     countdownLabel->setAlignment(Qt::AlignCenter);
     countdownLabel->setStyleSheet("font-size: 120px; font-weight: bold; color: #1B3B5F;");
     countdownLabel->hide();
+
+    // ============================
+    //   OVERLAY MESSAGE D'AVERTISSEMENT
+    // ============================
+    // Créer l'overlay qui se superpose à tout
+    warningOverlay = new QWidget(gameWidget);
+    warningOverlay->setStyleSheet("background-color: rgba(0, 0, 0, 100);");  // Fond semi-transparent
+    warningOverlay->hide();
+    warningOverlay->raise();  // Met l'overlay au-dessus de tout
+
+    // Layout pour centrer le message dans l'overlay
+    QVBoxLayout *overlayLayout = new QVBoxLayout(warningOverlay);
+    overlayLayout->setAlignment(Qt::AlignCenter);
+
+    warningLabel = new QLabel();
+    warningLabel->setAlignment(Qt::AlignCenter);
+    warningLabel->setStyleSheet(
+        "background-color: rgba(255, 140, 0, 230);"
+        "color: white;"
+        "font-size: 28px;"
+        "font-weight: bold;"
+        "padding: 25px 35px;"
+        "border-radius: 15px;"
+        "border: 4px solid rgba(255, 100, 0, 255);"
+        );
+    warningLabel->setWordWrap(true);
+    warningLabel->setMaximumWidth(1100);
+
+    // Ombre pour le message
+    auto *warningShadow = new QGraphicsDropShadowEffect;
+    warningShadow->setBlurRadius(40);
+    warningShadow->setOffset(0, 8);
+    warningShadow->setColor(QColor(0, 0, 0, 180));
+    warningLabel->setGraphicsEffect(warningShadow);
+
+    warningQuitButton = new QPushButton("Quitter la partie");
+    warningQuitButton->setFixedSize(250, 70);
+    warningQuitButton->setStyleSheet(
+        "QPushButton { background-color: #E74C3C; color: white; font-size: 24px; font-weight: bold; border-radius: 35px; }"
+        "QPushButton:hover { background-color: #C0392B; }"
+        "QPushButton:pressed { background-color: #A93226; }"
+        );
+    warningQuitButton->setCursor(Qt::PointingHandCursor);
+    connect(warningQuitButton, &QPushButton::clicked, this, &GameScreen::onQuitButtonClicked);
+
+    overlayLayout->addWidget(warningLabel);
+    overlayLayout->addSpacing(30);
+    overlayLayout->addWidget(warningQuitButton, 0, Qt::AlignCenter);
+
+    // ============================
+    //   OVERLAY MISE EN POSITION INITIALE
+    // ============================
+    initializingOverlay = new QWidget(gameWidget);
+    initializingOverlay->setStyleSheet("background-color: rgba(0, 0, 0, 150);");
+    initializingOverlay->hide();
+
+    QVBoxLayout *initLayout = new QVBoxLayout(initializingOverlay);
+    initLayout->setAlignment(Qt::AlignCenter);
+
+    initializingLabel = new QLabel("Mise en position initiale du robot...");
+    initializingLabel->setAlignment(Qt::AlignCenter);
+    initializingLabel->setStyleSheet(
+        "background-color: rgba(27, 59, 95, 230);"
+        "color: white;"
+        "font-size: 32px;"
+        "font-weight: bold;"
+        "padding: 35px 120px;"
+        "border-radius: 15px;"
+        );
+    initializingLabel->setMinimumWidth(900);
+
+    auto *initShadow = new QGraphicsDropShadowEffect;
+    initShadow->setBlurRadius(40);
+    initShadow->setOffset(0, 8);
+    initShadow->setColor(QColor(0, 0, 0, 180));
+    initializingLabel->setGraphicsEffect(initShadow);
+
+    initLayout->addWidget(initializingLabel);
+
+    // ============================
+    //   OVERLAY TRICHE DÉTECTÉE
+    // ============================
+    cheatOverlay = new QWidget(gameWidget);
+    cheatOverlay->setStyleSheet("background-color: rgba(0, 0, 0, 150);");
+    cheatOverlay->hide();
+
+    QVBoxLayout *cheatLayout = new QVBoxLayout(cheatOverlay);
+    cheatLayout->setAlignment(Qt::AlignCenter);
+
+    cheatLabel = new QLabel();
+    cheatLabel->setAlignment(Qt::AlignCenter);
+    cheatLabel->setStyleSheet(
+        "background-color: rgba(231, 76, 60, 230);"
+        "color: white;"
+        "font-size: 32px;"
+        "font-weight: bold;"
+        "padding: 35px 120px;"
+        "border-radius: 15px;"
+        );
+    cheatLabel->setWordWrap(true);
+    cheatLabel->setMinimumWidth(1000);
+
+    auto *cheatShadow = new QGraphicsDropShadowEffect;
+    cheatShadow->setBlurRadius(40);
+    cheatShadow->setOffset(0, 8);
+    cheatShadow->setColor(QColor(0, 0, 0, 180));
+    cheatLabel->setGraphicsEffect(cheatShadow);
+
+    cheatQuitButton = new QPushButton("Quitter la partie");
+    cheatQuitButton->setFixedSize(250, 70);
+    cheatQuitButton->setStyleSheet(
+        "QPushButton { background-color: #1B3B5F; color: white; font-size: 24px; font-weight: bold; border-radius: 35px; }"
+        "QPushButton:hover { background-color: #2C4D6F; }"
+        "QPushButton:pressed { background-color: #0A1B2F; }"
+        );
+    cheatQuitButton->setCursor(Qt::PointingHandCursor);
+    connect(cheatQuitButton, &QPushButton::clicked, this, &GameScreen::onQuitButtonClicked);
+
+    cheatLayout->addWidget(cheatLabel);
+    cheatLayout->addSpacing(30);
+    cheatLayout->addWidget(cheatQuitButton, 0, Qt::AlignCenter);
+
+    // ============================
+    //   OVERLAY RÉSERVOIRS VIDES
+    // ============================
+    reservoirOverlay = new QWidget(gameWidget);
+    reservoirOverlay->setStyleSheet("background-color: rgba(0, 0, 0, 150);");
+    reservoirOverlay->hide();
+
+    QVBoxLayout *reservoirLayout = new QVBoxLayout(reservoirOverlay);
+    reservoirLayout->setAlignment(Qt::AlignCenter);
+
+    reservoirLabel = new QLabel("RÉSERVOIRS VIDES\nVeuillez remplir les réservoirs de pions");
+    reservoirLabel->setAlignment(Qt::AlignCenter);
+    reservoirLabel->setStyleSheet(
+        "background-color: rgba(241, 196, 15, 230);"
+        "color: white;"
+        "font-size: 32px;"
+        "font-weight: bold;"
+        "padding: 35px 120px;"
+        "border-radius: 15px;"
+        );
+    reservoirLabel->setWordWrap(true);
+    reservoirLabel->setMinimumWidth(1000);
+
+    auto *reservoirShadow = new QGraphicsDropShadowEffect;
+    reservoirShadow->setBlurRadius(40);
+    reservoirShadow->setOffset(0, 8);
+    reservoirShadow->setColor(QColor(0, 0, 0, 180));
+    reservoirLabel->setGraphicsEffect(reservoirShadow);
+
+    reservoirRefillButton = new QPushButton("C'est fait !");
+    reservoirRefillButton->setFixedSize(250, 70);
+    reservoirRefillButton->setStyleSheet(
+        "QPushButton { background-color: #2ECC71; color: white; font-size: 24px; font-weight: bold; border-radius: 35px; }"
+        "QPushButton:hover { background-color: #27AE60; }"
+        "QPushButton:pressed { background-color: #1E8449; }"
+        );
+    reservoirRefillButton->setCursor(Qt::PointingHandCursor);
+    connect(reservoirRefillButton, &QPushButton::clicked, [this]() {
+        reservoirOverlay->hide();
+        emit reservoirsRefilled();
+    });
+
+    reservoirLayout->addWidget(reservoirLabel);
+    reservoirLayout->addSpacing(30);
+    reservoirLayout->addWidget(reservoirRefillButton, 0, Qt::AlignCenter);
+
+    // ============================
+    //   OVERLAY RÉSULTAT DE LA PARTIE
+    // ============================
+    resultOverlay = new QWidget(gameWidget);
+    resultOverlay->setStyleSheet("background-color: rgba(0, 0, 0, 180);");
+    resultOverlay->hide();
+
+    QVBoxLayout *resultLayout = new QVBoxLayout(resultOverlay);
+    resultLayout->setAlignment(Qt::AlignCenter);
+
+    resultLabel = new QLabel();
+    resultLabel->setAlignment(Qt::AlignCenter);
+    resultLabel->setStyleSheet(
+        "background-color: rgba(27, 59, 95, 240);"
+        "color: white;"
+        "font-size: 36px;"
+        "font-weight: bold;"
+        "padding: 40px 100px;"
+        "border-radius: 20px;"
+        );
+    resultLabel->setWordWrap(true);
+    resultLabel->setMinimumWidth(1100);
+
+    auto *resultShadow = new QGraphicsDropShadowEffect;
+    resultShadow->setBlurRadius(50);
+    resultShadow->setOffset(0, 10);
+    resultShadow->setColor(QColor(0, 0, 0, 200));
+    resultLabel->setGraphicsEffect(resultShadow);
+
+    resultQuitButton = new QPushButton("Retour au menu");
+    resultQuitButton->setFixedSize(300, 80);
+    resultQuitButton->setStyleSheet(
+        "QPushButton { background-color: #2ECC71; color: white; font-size: 26px; font-weight: bold; border-radius: 40px; }"
+        "QPushButton:hover { background-color: #27AE60; }"
+        "QPushButton:pressed { background-color: #1E8449; }"
+        );
+    resultQuitButton->setCursor(Qt::PointingHandCursor);
+    connect(resultQuitButton, &QPushButton::clicked, this, &GameScreen::onQuitButtonClicked);
+
+    resultLayout->addWidget(resultLabel);
+    resultLayout->addSpacing(40);
+    resultLayout->addWidget(resultQuitButton, 0, Qt::AlignCenter);
 
     // Layout pour le countdown centré
     QVBoxLayout *countdownLayout = new QVBoxLayout;
@@ -208,16 +424,46 @@ void GameScreen::createConfirmWidget()
 }
 
 // ============================================================
-// DÉMARRAGE DU JEU (à appeler quand on affiche GameScreen)
+// RÉINITIALISATION COMPLÈTE DE L'ÉCRAN DE JEU
 // ============================================================
-void GameScreen::startGame()
+void GameScreen::resetGame()
 {
-    // Retour au widget de jeu
-    stack->setCurrentWidget(gameWidget);
+    // Arrêter tous les timers
+    chronometer.stop();
+    countdownTimer.stop();
+    gridWarningDelayTimer.stop();
 
     // Réinitialiser le chronomètre
     elapsedSeconds = 0;
     timerLabel->setText("00:00");
+
+    // Réinitialiser les flags
+    allowGridWarning = false;
+    countdownValue = 3;
+
+    // Cacher tous les overlays
+    resetAllOverlays();
+    initializingOverlay->hide();
+    cheatOverlay->hide();
+    reservoirOverlay->hide();
+    resultOverlay->hide();
+
+    // Réinitialiser les labels
+    titleLabel->setText("Partie en mode ");
+    turnLabel->setText("");
+    cameraLabel->clear();
+
+    // Retour au widget de jeu
+    stack->setCurrentWidget(gameWidget);
+}
+
+// ============================================================
+// DÉMARRAGE DU JEU (à appeler quand on affiche GameScreen)
+// ============================================================
+void GameScreen::startGame()
+{
+    // Réinitialiser complètement l'écran avant de commencer
+    resetGame();
 
     // Tout est caché pendant le countdown
     quitButton->hide();
@@ -226,7 +472,22 @@ void GameScreen::startGame()
     turnLabel->hide();
     cameraLabel->hide();
 
-    // Lancer le countdown
+    // Préparer le robot AVANT le countdown (connexion + Home)
+    emit prepareGame();
+
+    // Le countdown sera lancé automatiquement quand le robot sera prêt
+    // via le signal robotInitialized connecté à startCountdownWhenReady()
+}
+
+// ============================================================
+// DÉMARRAGE DU COUNTDOWN QUAND LE ROBOT EST PRÊT
+// ============================================================
+void GameScreen::startCountdownWhenReady()
+{
+    // Réinitialiser le flag d'avertissement de grille
+    allowGridWarning = false;
+
+    // Lancer le countdown maintenant que le robot est prêt
     startCountdown();
 }
 
@@ -263,6 +524,10 @@ void GameScreen::updateCountdown()
             // Démarrer le chronomètre et la partie
             chronometer.start(1000);
             emit countdownFinished();
+
+            // Activer les avertissements de grille après 5 secondes
+            // (temps pour que la caméra s'initialise correctement)
+            gridWarningDelayTimer.start(5000);
         });
     }
     else
@@ -289,12 +554,20 @@ void GameScreen::updateChronometer()
 // ============================================================
 void GameScreen::updateCameraFrame(const QImage &img)
 {
-    if (!img.isNull())
+    if (!img.isNull()) {
+        // Utiliser la taille réelle du label, ou une taille par défaut si le layout n'est pas prêt
+        QSize targetSize = cameraLabel->size();
+        if (targetSize.width() <= 0 || targetSize.height() <= 0) {
+            // Fallback : utiliser la taille minimale définie
+            targetSize = QSize(800, 450);
+        }
+
         cameraLabel->setPixmap(QPixmap::fromImage(img).scaled(
-            cameraLabel->size(),
+            targetSize,
             Qt::KeepAspectRatio,
             Qt::SmoothTransformation
-            ));
+        ));
+    }
 }
 
 void GameScreen::setTurnPlayer()
@@ -306,6 +579,12 @@ void GameScreen::setTurnPlayer()
 void GameScreen::setTurnRobot()
 {
     turnLabel->setText("Au tour du robot");
+    turnLabel->setStyleSheet("font-size: 35px; font-weight: bold; color: #EFCB00;");
+}
+
+void GameScreen::setRobotStatus(const QString &status)
+{
+    turnLabel->setText(QString("Au tour du robot : %1").arg(status));
     turnLabel->setStyleSheet("font-size: 35px; font-weight: bold; color: #EFCB00;");
 }
 
@@ -343,4 +622,131 @@ void GameScreen::returnToGame()
 void GameScreen::onQuitButtonClicked()
 {
     emit quitRequested();
+}
+
+// ============================================================
+//   AFFICHAGE AVERTISSEMENT GRILLE INCOMPLÈTE
+// ============================================================
+void GameScreen::showGridIncompleteWarning(int detectedCount)
+{
+    // Ne pas afficher l'avertissement trop tôt (pendant l'initialisation de la caméra)
+    if (!allowGridWarning) {
+        return;
+    }
+
+    warningLabel->setText(QString("GRILLE INCOMPLÈTE - %1/42 cases détectées\nAjustez le cadrage ou l'éclairage").arg(detectedCount));
+
+    // Redimensionner l'overlay pour qu'il prenne toute la taille du gameWidget
+    warningOverlay->setGeometry(gameWidget->rect());
+    warningOverlay->show();
+    warningOverlay->raise();  // S'assurer qu'il est au-dessus
+}
+
+// ============================================================
+//   AFFICHAGE MISE EN POSITION INITIALE
+// ============================================================
+void GameScreen::showRobotInitializing()
+{
+    initializingOverlay->setGeometry(gameWidget->rect());
+    initializingOverlay->show();
+    initializingOverlay->raise();
+}
+
+void GameScreen::hideRobotInitializing()
+{
+    initializingOverlay->hide();
+}
+
+// ============================================================
+//   AFFICHAGE TRICHE DÉTECTÉE
+// ============================================================
+void GameScreen::showCheatDetected(const QString &reason)
+{
+    cheatLabel->setText(reason);
+    cheatOverlay->setGeometry(gameWidget->rect());
+    cheatOverlay->show();
+    cheatOverlay->raise();
+}
+
+// ============================================================
+//   AFFICHAGE RÉSERVOIRS VIDES
+// ============================================================
+void GameScreen::showReservoirEmpty()
+{
+    reservoirOverlay->setGeometry(gameWidget->rect());
+    reservoirOverlay->show();
+    reservoirOverlay->raise();
+}
+
+// ============================================================
+//   RESET TOUS LES OVERLAYS
+// ============================================================
+void GameScreen::resetAllOverlays()
+{
+    warningOverlay->hide();
+    initializingOverlay->hide();
+    cheatOverlay->hide();
+    // NE PAS cacher reservoirOverlay - il est prioritaire et ne peut être fermé que par le bouton
+}
+
+// ============================================================
+//   AFFICHAGE RÉSULTAT DE LA PARTIE
+// ============================================================
+void GameScreen::showGameResult(const QString &winner, const QString &difficulty, int totalSeconds)
+{
+    chronometer.stop();
+
+    // Utiliser le temps du chronomètre local, pas celui passé en paramètre (qui est toujours 0)
+    int actualTime = elapsedSeconds;
+
+    QString message;
+    if (winner == "Joueur") {
+        message = "VICTOIRE !\n\n";
+    } else if (winner == "Robot") {
+        message = "DÉFAITE\n\n";
+    } else {
+        message = "ÉGALITÉ\n\n";
+    }
+
+    message += QString("Difficulté : %1\n").arg(difficulty);
+    message += QString("Temps : %1:%2")
+                   .arg(actualTime / 60, 2, 10, QChar('0'))
+                   .arg(actualTime % 60, 2, 10, QChar('0'));
+
+    resultLabel->setText(message);
+    resultOverlay->setGeometry(gameWidget->rect());
+    resultOverlay->show();
+    resultOverlay->raise();
+}
+
+// ============================================================
+//   VÉRIFIER SI OVERLAY RÉSERVOIRS EST VISIBLE
+// ============================================================
+bool GameScreen::isReservoirOverlayVisible() const
+{
+    return reservoirOverlay->isVisible();
+}
+
+// ============================================================
+//   EVENT DE REDIMENSIONNEMENT
+// ============================================================
+void GameScreen::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    // Redimensionner les overlays s'ils sont visibles
+    if (warningOverlay && warningOverlay->isVisible()) {
+        warningOverlay->setGeometry(gameWidget->rect());
+    }
+    if (initializingOverlay && initializingOverlay->isVisible()) {
+        initializingOverlay->setGeometry(gameWidget->rect());
+    }
+    if (cheatOverlay && cheatOverlay->isVisible()) {
+        cheatOverlay->setGeometry(gameWidget->rect());
+    }
+    if (reservoirOverlay && reservoirOverlay->isVisible()) {
+        reservoirOverlay->setGeometry(gameWidget->rect());
+    }
+    if (resultOverlay && resultOverlay->isVisible()) {
+        resultOverlay->setGeometry(gameWidget->rect());
+    }
 }

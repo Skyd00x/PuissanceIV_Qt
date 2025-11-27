@@ -108,6 +108,9 @@ void CameraAI::stop()
     if (cap.isOpened())
         cap.release();
 
+    // Réinitialiser le compteur de détections incomplètes
+    incompleteCount_ = 0;
+
     qDebug() << "[AI] 🛑 Capture arrêtée";
 }
 
@@ -190,7 +193,7 @@ std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR)
     at::Tensor conf, labels;
     std::tie(conf, labels) = cls_scores.max(1);
 
-    const float confTh = 0.25f;
+    const float confTh = 0.90f;  // Filtrer les prédictions < 90% de confiance
     at::Tensor keep = conf > confTh;
     boxes_xywh = boxes_xywh.index({keep});
     conf = conf.index({keep});
@@ -300,7 +303,20 @@ std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR)
 void CameraAI::updateGrid(const std::vector<Detection>& dets)
 {
     if ((int)dets.size() != rows_ * cols_) {
+        // Grille incomplète - incrémenter le compteur
+        incompleteCount_++;
+
+        // Émettre le signal seulement après 5 détections consécutives
+        if (incompleteCount_ >= 5) {
+            emit gridIncomplete((int)dets.size());
+        }
         return;
+    }
+
+    // La grille est complète - réinitialiser le compteur et émettre le signal si elle était incomplète avant
+    if (incompleteCount_ > 0) {
+        incompleteCount_ = 0;
+        emit gridComplete();
     }
 
     struct Cell { float cx, cy; int val; };
@@ -336,6 +352,21 @@ void CameraAI::updateGrid(const std::vector<Detection>& dets)
 
         for (int c = 0; c < cols_; ++c)
             newGrid[r][c] = cells[start + c].val;
+    }
+
+    // Validation : un pion ne peut pas flotter dans l'air
+    // Il doit avoir un support en dessous (ou être sur la ligne du bas)
+    for (int r = 0; r < rows_ - 1; ++r) {  // Pas besoin de vérifier la dernière ligne
+        for (int c = 0; c < cols_; ++c) {
+            // Si c'est un pion (rouge=1 ou jaune=2)
+            if (newGrid[r][c] != 0) {
+                // Vérifier qu'il y a un support en dessous (ligne r+1)
+                if (newGrid[r + 1][c] == 0) {
+                    // Pas de support → ignorer ce pion (défaillance du modèle)
+                    newGrid[r][c] = 0;
+                }
+            }
+        }
     }
 
     QMutexLocker lock(&gridMutex_);

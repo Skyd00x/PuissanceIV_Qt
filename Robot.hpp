@@ -3,6 +3,7 @@
 #include <thread>
 #include <chrono>
 #include <QObject>
+#include <qdebug.h>
 #include <algorithm>
 // === SDK Dobot Magician ===
 #include "DobotDll.h"
