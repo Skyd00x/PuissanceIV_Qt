@@ -104,7 +104,8 @@ void GameLogic::prepareGame()
             qDebug() << "[GameLogic] Positionnement au-dessus du premier pion (Left_1)...";
             CalibPoint firstPiece = CalibPoint::Left_1;
             Pose firstPose = calib->getPosition(firstPiece);
-            robot->goToSecurized(firstPose);
+            float safeZ = calib->getSafeHeight();
+            robot->goToSecurized(firstPose, safeZ);
             qDebug() << "[GameLogic] Robot positionné au-dessus du pion Left_1";
 
             // Vérifier que la pince est bien fermée (état initial avant le début de la partie)
@@ -403,7 +404,8 @@ void GameLogic::onGridUpdated(const QVector<QVector<int>>& g)
                 qDebug() << "[GameLogic] Déplacement au-dessus du prochain pion à la position" << (int)nextPos;
                 emit robotStatus("Se repositionne au-dessus du prochain pion");
                 Pose nextPose = calib->getPosition(nextPos);
-                robot->goToSecurized(nextPose);
+                float safeZ = calib->getSafeHeight();
+                robot->goToSecurized(nextPose, safeZ);
             }
 
             qDebug() << "[GameLogic] Passage au tour du joueur";

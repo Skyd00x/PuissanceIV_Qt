@@ -133,11 +133,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(calibrationScreen, &CalibrationScreen::backToMenuRequested, this, [this]() {
         qDebug() << "[MainWindow] Signal backToMenuRequested reçu";
 
-        // IMPORTANT : Déconnecter le robot IMMÉDIATEMENT pour éviter les conflits
-        // lors du prochain lancement de partie
-        qDebug() << "[MainWindow] Déconnexion du robot...";
-        calibrationScreen->getCalibrationLogic()->disconnectToRobot();
-        qDebug() << "[MainWindow] Robot déconnecté";
+        // IMPORTANT : Le robot a déjà été déconnecté dans CalibrationScreen::onQuitButtonClicked()
+        // On évite donc la double déconnexion qui pourrait causer un crash
 
         // Informer GameLogic que le robot a été déconnecté
         gameLogic->resetRobotConnection();

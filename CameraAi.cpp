@@ -28,7 +28,7 @@ CameraAI::~CameraAI() {
 
 void CameraAI::loadModel()
 {
-    QString modelPath = QCoreApplication::applicationDirPath() + "/Model/best7.torchscript";
+    QString modelPath = QCoreApplication::applicationDirPath() + "/Model/model.torchscript";
     qDebug() << "[AI] Chargement du modèle :" << modelPath;
 
     std::filesystem::path fsPath = modelPath.toStdWString();
@@ -151,7 +151,7 @@ std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR)
     if (!model || frameBGR.empty())
         return results;
 
-    const int imgsz = 960;
+    const int imgsz = 640;
     const cv::Scalar padColor(114, 114, 114);
 
     int h0 = frameBGR.rows, w0 = frameBGR.cols;

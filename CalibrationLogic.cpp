@@ -6,7 +6,7 @@
 #include <cmath>
 
 CalibrationLogic::CalibrationLogic(Robot* robot, QObject* parent)
-    : QObject(parent), robot(robot), connected(false), stepIndex(0), gripperOpen(false)
+    : QObject(parent), robot(robot), connected(false), stepIndex(0), gripperOpen(false), shouldStop_(false)
 {
     steps = {
         { "Videz les réservoirs, sauf un pion dans le réservoir de gauche à l'emplacement 1.",
@@ -34,18 +34,35 @@ CalibrationLogic::CalibrationLogic(Robot* robot, QObject* parent)
 // === Connexion au robot ===
 bool CalibrationLogic::connectToRobot() {
     if (!robot) return false;
+    shouldStop_ = false;  // Réinitialiser le flag au moment de la connexion
     connected = robot->connect();
     emit connectionFinished(connected);
     return connected;
 }
 
 void CalibrationLogic::disconnectToRobot() {
+    // Si déjà déconnecté, ne rien faire (évite le crash de double déconnexion)
+    if (!connected) {
+        qDebug() << "[CalibrationLogic] Déjà déconnecté, rien à faire";
+        return;
+    }
+
+    qDebug() << "[CalibrationLogic] Déconnexion du robot...";
+
+    // Arrêter tous les threads en cours
+    shouldStop_ = true;
+
+    // Attendre un peu pour laisser les threads se terminer proprement
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
     if (robot) {
         robot->turnOffGripper();
         robot->disconnect();
     }
     connected = false;
     gripperOpen = false;
+
+    qDebug() << "[CalibrationLogic] Robot déconnecté";
 }
 
 void CalibrationLogic::homeRobot() {
@@ -53,7 +70,11 @@ void CalibrationLogic::homeRobot() {
 
     std::thread([this]() {
         robot->Home();
-        QMetaObject::invokeMethod(this, [this]() { emit robotReady(); }, Qt::QueuedConnection);
+
+        // Vérifier si on doit arrêter avant d'émettre le signal
+        if (!shouldStop_) {
+            QMetaObject::invokeMethod(this, [this]() { emit robotReady(); }, Qt::QueuedConnection);
+        }
     }).detach();
 }
 
@@ -176,22 +197,34 @@ void CalibrationLogic::testCalibration() {
 
     std::thread([this]() {
         int total = (int)CalibPoint::Count;
+        float safeZ = getSafeHeight();
 
         for (int i = 0; i < total; i++) {
-            robot->goToSecurized(calibratedPoints[i]);
+            // Vérifier si on doit arrêter
+            if (shouldStop_) {
+                qDebug() << "[CalibrationLogic] Test de calibration interrompu";
+                return;
+            }
+
+            robot->goToSecurized(calibratedPoints[i], safeZ);
 
             int progress = (i + 1) * 100 / total;
-            QMetaObject::invokeMethod(this, [this, progress]() {
-                emit progressChanged(progress);
-            }, Qt::QueuedConnection);
+            if (!shouldStop_) {
+                QMetaObject::invokeMethod(this, [this, progress]() {
+                    emit progressChanged(progress);
+                }, Qt::QueuedConnection);
+            }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(150));
         }
 
-        QMetaObject::invokeMethod(this, [this]() {
-            emit calibrationTestFinished();
-            emit progressChanged(100);
-        }, Qt::QueuedConnection);
+        // Émettre le signal de fin seulement si on n'a pas été interrompu
+        if (!shouldStop_) {
+            QMetaObject::invokeMethod(this, [this]() {
+                emit calibrationTestFinished();
+                emit progressChanged(100);
+            }, Qt::QueuedConnection);
+        }
 
     }).detach();
 }
@@ -202,6 +235,12 @@ void CalibrationLogic::toggleGripper() {
     if (gripperOpen) robot->closeGripper();
     else robot->openGripper();
     gripperOpen = !gripperOpen;
+
+    // Attendre que la pince ait bien fini son mouvement
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    // Couper le compresseur une fois l'action effectuée
+    robot->turnOffGripper();
 }
 
 void CalibrationLogic::rotateLeft()  { if (connected) robot->rotate(+5); }
@@ -278,6 +317,25 @@ Pose CalibrationLogic::getPoseForColumn(int col) const {
     return calibratedPoints[(int)CalibPoint::Grid_1 + col];
 }
 
+float CalibrationLogic::getSafeHeight() const {
+    // Parcourir tous les points calibrés pour trouver le z maximum
+    float maxZ = -1000.0f;  // Valeur très basse pour commencer
+
+    for (int i = 0; i < (int)CalibPoint::Count; i++) {
+        if (calibratedPoints[i].z > maxZ) {
+            maxZ = calibratedPoints[i].z;
+        }
+    }
+
+    // Si aucun point n'a été trouvé (calibration vide), utiliser une valeur par défaut
+    if (maxZ < -999.0f) {
+        return 150.0f;
+    }
+
+    // Retourner le z max + 30 pour la sécurité
+    return maxZ + 30.0f;
+}
+
 // =====================================================
 //   Fonctions de haut niveau pour manipuler les pions
 // =====================================================
@@ -295,11 +353,16 @@ void CalibrationLogic::pickPiece(CalibPoint reservoirPosition) {
         return;
     }
 
+    // IMPORTANT: Ouvrir la pince AVANT de descendre sur le pion
+    robot->openGripper();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
     // Récupérer la position calibrée
     Pose pickPose = calibratedPoints[posIndex];
 
-    // Aller chercher le pion de manière sécurisée
-    robot->goToSecurized(pickPose);
+    // Aller chercher le pion de manière sécurisée avec hauteur calculée
+    float safeZ = getSafeHeight();
+    robot->goToSecurized(pickPose, safeZ);
 
     // Fermer la pince pour attraper le pion
     robot->closeGripper();
@@ -320,8 +383,9 @@ void CalibrationLogic::dropPiece(int column) {
     // Récupérer la position de la colonne
     Pose dropPose = getPoseForColumn(column);
 
-    // Aller à la colonne de manière sécurisée
-    robot->goToSecurized(dropPose);
+    // Aller à la colonne de manière sécurisée avec hauteur calculée
+    float safeZ = getSafeHeight();
+    robot->goToSecurized(dropPose, safeZ);
 
     // Ouvrir la pince pour lâcher le pion
     robot->openGripper();

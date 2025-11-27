@@ -28,10 +28,10 @@ public:
     static bool isAvailable();   // Vérifie si un Dobot est détectable
 
     // === Mouvements ===
-    void Home();                 // Retourne le robot en position Home
-    void goTo(Pose p);           // Déplacement direct (PTP)
-    void goToSecurized(Pose p);  // Déplacement sécurisé
-    void rotate(float delta);    // Rotation relative de la pince
+    void Home();                           // Retourne le robot en position Home
+    void goTo(Pose p);                     // Déplacement direct (PTP)
+    void goToSecurized(Pose p, float safeZ = 150.0f);  // Déplacement sécurisé avec hauteur de sécurité
+    void rotate(float delta);              // Rotation relative de la pince
 
     // === Contrôle de la pince ===
     void openGripper();          // Ouvre la pince

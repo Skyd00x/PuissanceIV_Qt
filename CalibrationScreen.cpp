@@ -301,7 +301,14 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     connect(restartButton, &QPushButton::clicked, this, &CalibrationScreen::onRestartClicked);
 
     connect(menuButton, &QPushButton::clicked, this, [this]() {
-        qDebug() << "[CalibrationScreen] Bouton menu cliqué - émission du signal backToMenuRequested";
+        qDebug() << "[CalibrationScreen] Bouton menu cliqué - nettoyage avant de quitter";
+
+        // Déconnexion propre avant de retourner au menu
+        logic->disconnectToRobot();
+        currentStep = 0;
+        isConnecting = false;
+
+        qDebug() << "[CalibrationScreen] Émission du signal backToMenuRequested";
         emit backToMenuRequested();
     });
 
@@ -608,10 +615,25 @@ void CalibrationScreen::returnToCalibration() {
 }
 
 void CalibrationScreen::onQuitButtonClicked() {
-    qDebug() << "[CalibrationScreen] Bouton Oui cliqué - émission du signal backToMenuRequested";
-    // Remettre sur le widget principal avant de quitter
+    qDebug() << "[CalibrationScreen] Bouton Oui cliqué - nettoyage avant de quitter";
+
+    // Remettre sur le widget principal
     mainStack->setCurrentWidget(mainWidget);
+
+    // IMPORTANT: Faire le reset/déconnexion AVANT d'émettre le signal
+    // pour éviter les problèmes de threads et de double déconnexion
+    qDebug() << "[CalibrationScreen] Déconnexion et reset de la calibration...";
+    logic->disconnectToRobot();
+    currentStep = 0;
+    progressBar->setRange(0, 7);
+    progressBar->setValue(0);
+    progressBar->hide();
+    loadingMovie->stop();
+    loadingLabel->hide();
+    isConnecting = false;
+
     // Émettre le signal pour retourner au menu
+    qDebug() << "[CalibrationScreen] Émission du signal backToMenuRequested";
     emit backToMenuRequested();
     qDebug() << "[CalibrationScreen] Signal backToMenuRequested émis";
 }

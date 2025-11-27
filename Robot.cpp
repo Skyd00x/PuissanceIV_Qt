@@ -82,27 +82,27 @@ void Robot::goTo(Pose p)
     waitForCompletion(idx);
 }
 
-void Robot::goToSecurized(Pose target)
+void Robot::goToSecurized(Pose target, float safeZ)
 {
     // === SYSTÈME DE POINTS DE PASSAGE POUR ÉVITER LES COLLISIONS ===
-    // 1. Monter à z=150 (position de sécurité)
-    // 2. Se déplacer horizontalement à z=150
+    // 1. Monter à la hauteur de sécurité (safeZ)
+    // 2. Se déplacer horizontalement à safeZ
     // 3. Descendre à la position cible
 
     // Récupère la pose actuelle
     Pose current;
     GetPose(&current);
 
-    // Étape 1 : Monter à z=150 avec la position actuelle (x, y)
-    qDebug() << "[Robot] Étape 1/3 : Montée à z=150 (sécurité)";
+    // Étape 1 : Monter à safeZ avec la position actuelle (x, y)
+    qDebug() << "[Robot] Étape 1/3 : Montée à z=" << safeZ << " (sécurité)";
     Pose stepUp = current;
-    stepUp.z = 150.0f;
+    stepUp.z = safeZ;
     goTo(stepUp);
 
-    // Étape 2 : Se déplacer horizontalement au-dessus de la cible à z=150
-    qDebug() << "[Robot] Étape 2/3 : Déplacement horizontal vers (x=" << target.x << ", y=" << target.y << ", z=150)";
+    // Étape 2 : Se déplacer horizontalement au-dessus de la cible à safeZ
+    qDebug() << "[Robot] Étape 2/3 : Déplacement horizontal vers (x=" << target.x << ", y=" << target.y << ", z=" << safeZ << ")";
     Pose stepOver = target;
-    stepOver.z = 150.0f;
+    stepOver.z = safeZ;
     goTo(stepOver);
 
     // Étape 3 : Descendre à la position cible finale

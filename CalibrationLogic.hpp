@@ -7,6 +7,7 @@
 #include <QFile>
 #include <vector>
 #include <array>
+#include <atomic>
 #include "Robot.hpp"
 
 // =============================
@@ -70,6 +71,9 @@ public:
     // Position pour déposer dans une colonne de la grille (0..6)
     Pose getPoseForColumn(int col) const;
 
+    // Hauteur de sécurité calculée d'après les points calibrés (max z + 30)
+    float getSafeHeight() const;
+
     // === Fonctions de haut niveau pour manipuler les pions ===
     // Prendre un pion à une position de réservoir (Left_1..Left_4 ou Right_1..Right_4)
     void pickPiece(CalibPoint reservoirPosition);
@@ -94,6 +98,9 @@ private:
     bool connected;
     int stepIndex;
     bool gripperOpen;
+
+    // Flag pour arrêter les threads en cours
+    std::atomic<bool> shouldStop_;
 
     std::vector<CalibrationStep> steps;
     std::vector<CalibrationStepData> calibrationData; // bruts des étapes manu
