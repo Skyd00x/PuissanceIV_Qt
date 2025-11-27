@@ -232,19 +232,45 @@ void CalibrationLogic::testCalibration() {
 // === Manipulations manuelles ===
 void CalibrationLogic::toggleGripper() {
     if (!connected || !robot) return;
-    if (gripperOpen) robot->closeGripper();
-    else robot->openGripper();
-    gripperOpen = !gripperOpen;
 
-    // Attendre que la pince ait bien fini son mouvement
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    if (gripperOpen) {
+        // Fermer la pince
+        robot->closeGripper();
+        gripperOpen = false;
 
-    // Couper le compresseur une fois l'action effectuée
-    robot->turnOffGripper();
+        // Attendre que la pince soit bien fermée
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+        // IMPORTANT: Laisser le compresseur allumé pour maintenir la prise
+        qDebug() << "[CalibrationLogic] Pince fermée - compresseur maintenu actif";
+    }
+    else {
+        // Ouvrir la pince
+        robot->openGripper();
+        gripperOpen = true;
+
+        // Attendre que la pince soit bien ouverte
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+        // Couper le compresseur après ouverture
+        robot->turnOffGripper();
+        qDebug() << "[CalibrationLogic] Pince ouverte - compresseur coupé";
+    }
+
+    // Émettre le signal de changement d'état
+    emit gripperStateChanged(gripperOpen);
 }
 
 void CalibrationLogic::rotateLeft()  { if (connected) robot->rotate(+5); }
 void CalibrationLogic::rotateRight() { if (connected) robot->rotate(-5); }
+
+// === Déplacements fins sur les axes (1mm par clic) ===
+void CalibrationLogic::moveXPlus()  { if (connected && robot) robot->moveAxis('x', +1.0f); }
+void CalibrationLogic::moveXMinus() { if (connected && robot) robot->moveAxis('x', -1.0f); }
+void CalibrationLogic::moveYPlus()  { if (connected && robot) robot->moveAxis('y', +1.0f); }
+void CalibrationLogic::moveYMinus() { if (connected && robot) robot->moveAxis('y', -1.0f); }
+void CalibrationLogic::moveZPlus()  { if (connected && robot) robot->moveAxis('z', +1.0f); }
+void CalibrationLogic::moveZMinus() { if (connected && robot) robot->moveAxis('z', -1.0f); }
 
 // === Sauvegarde ===
 void CalibrationLogic::saveCalibration(const QString& path) {

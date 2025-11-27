@@ -112,6 +112,14 @@ private:
     QPushButton* rotateLeftButton;
     QPushButton* rotateRightButton;
 
+    // Boutons de déplacement fin (axes X, Y, Z)
+    QPushButton* moveXPlusButton;
+    QPushButton* moveXMinusButton;
+    QPushButton* moveYPlusButton;
+    QPushButton* moveYMinusButton;
+    QPushButton* moveZPlusButton;
+    QPushButton* moveZMinusButton;
+
     QLabel* endLabel;
     QPushButton* testButton;
     QPushButton* restartButton;

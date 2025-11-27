@@ -56,6 +56,14 @@ public:
     void rotateLeft();
     void rotateRight();
 
+    // Déplacements fins sur les axes (par pas de 0.1mm)
+    void moveXPlus();
+    void moveXMinus();
+    void moveYPlus();
+    void moveYMinus();
+    void moveZPlus();
+    void moveZMinus();
+
     void saveCalibration(const QString& path);
     void loadCalibration(const QString& path);
 
@@ -88,6 +96,7 @@ signals:
     void stepChanged(const CalibrationStep& step, int index);
     void calibrationFinished();
     void calibrationTestFinished();
+    void gripperStateChanged(bool isOpen);  // Signal émis quand l'état de la pince change
 
 private:
     std::vector<Pose> interpolatePoints(const Pose& start, const Pose& end, int count);

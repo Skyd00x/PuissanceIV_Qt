@@ -44,6 +44,12 @@ bool Robot::isAvailable()
     return SearchDobot(list, sizeof(list)) > 0;
 }
 
+void Robot::clearAlarms()
+{
+    ClearAllAlarmsState();
+    qDebug() << "[Robot] Alarmes clearées";
+}
+
 // ============================================================================
 //  Position Home
 // ============================================================================
@@ -70,6 +76,9 @@ void Robot::Home()
 // ============================================================================
 void Robot::goTo(Pose p)
 {
+    // Clear les alarmes avant le mouvement pour éviter les blocages
+    clearAlarms();
+
     PTPCmd cmd = {0};
     cmd.ptpMode = PTPMOVJXYZMode;
     cmd.x = p.x;
@@ -114,12 +123,64 @@ void Robot::goToSecurized(Pose target, float safeZ)
 
 void Robot::rotate(float delta)
 {
+    // Clear les alarmes avant le mouvement
+    clearAlarms();
+
     // Récupère la pose actuelle
     Pose p;
     GetPose(&p);
 
     // Clamp de la rotation
     p.r = std::clamp(p.r + delta, -100.0f, 100.0f);
+
+    // Envoie de la commande
+    PTPCmd cmd = {0};
+    cmd.ptpMode = PTPMOVJXYZMode;
+    cmd.x = p.x;
+    cmd.y = p.y;
+    cmd.z = p.z;
+    cmd.r = p.r;
+
+    uint64_t idx = 0;
+
+    // On utilise une queue dédiée pour cette action
+    SetQueuedCmdClear();
+    SetQueuedCmdStartExec();
+    SetPTPCmd(&cmd, true, &idx);
+
+    waitForCompletion(idx);
+}
+
+void Robot::moveAxis(char axis, float delta)
+{
+    // Clear les alarmes avant le mouvement
+    clearAlarms();
+
+    // Récupère la pose actuelle
+    Pose p;
+    GetPose(&p);
+
+    // Applique le delta sur l'axe spécifié
+    switch (axis) {
+        case 'x':
+        case 'X':
+            p.x += delta;
+            qDebug() << "[Robot] Déplacement X de" << delta << "mm -> nouvelle position X =" << p.x;
+            break;
+        case 'y':
+        case 'Y':
+            p.y += delta;
+            qDebug() << "[Robot] Déplacement Y de" << delta << "mm -> nouvelle position Y =" << p.y;
+            break;
+        case 'z':
+        case 'Z':
+            p.z += delta;
+            qDebug() << "[Robot] Déplacement Z de" << delta << "mm -> nouvelle position Z =" << p.z;
+            break;
+        default:
+            qWarning() << "[Robot] Axe invalide:" << axis;
+            return;
+    }
 
     // Envoie de la commande
     PTPCmd cmd = {0};

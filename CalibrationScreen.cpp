@@ -124,9 +124,50 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         instructionsView->setMinimumWidth(750);
         instructionsView->setMaximumHeight(100);
 
-        toggleGripperButton = new QPushButton("Ouvrir / Fermer la pince");
+        toggleGripperButton = new QPushButton("Ouvrir la pince");  // État initial : pince fermée
         rotateLeftButton   = new QPushButton("↺ Tourner gauche");
         rotateRightButton  = new QPushButton("↻ Tourner droite");
+
+        // Boutons de déplacement fin
+        moveXPlusButton  = new QPushButton("X+");
+        moveXMinusButton = new QPushButton("X-");
+        moveYPlusButton  = new QPushButton("Y+");
+        moveYMinusButton = new QPushButton("Y-");
+        moveZPlusButton  = new QPushButton("Z+");
+        moveZMinusButton = new QPushButton("Z-");
+
+        // Style compact pour les boutons de déplacement
+        QString compactStyle = QString(
+            "QPushButton {"
+            "   background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #4F8ED8, stop:1 #1B3B5F);"
+            "   color: white;"
+            "   font-size: 14px;"
+            "   font-weight: bold;"
+            "   border: none;"
+            "   border-radius: 15px;"
+            "   padding: 5px;"
+            "   min-width: 35px;"
+            "   max-width: 35px;"
+            "   min-height: 30px;"
+            "   max-height: 30px;"
+            "}"
+            "QPushButton:hover {"
+            "   background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #66B0FF, stop:1 #347AD1);"
+            "}"
+            "QPushButton:pressed {"
+            "   background-color: #1B3B5F;"
+            "}"
+        );
+
+        QList<QPushButton*> moveButtons = {
+            moveXPlusButton, moveXMinusButton,
+            moveYPlusButton, moveYMinusButton,
+            moveZPlusButton, moveZMinusButton
+        };
+        for (auto *btn : moveButtons) {
+            btn->setStyleSheet(compactStyle);
+            btn->setCursor(Qt::PointingHandCursor);
+        }
 
         backButton = new QPushButton("Retour");
         nextButton = new QPushButton("Suivant");
@@ -138,6 +179,17 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         gripLayout->addWidget(rotateLeftButton);
         gripLayout->addWidget(rotateRightButton);
 
+        // Layout pour les boutons de déplacement fin
+        QHBoxLayout* moveLayout = new QHBoxLayout();
+        moveLayout->setAlignment(Qt::AlignCenter);
+        moveLayout->setSpacing(5);
+        moveLayout->addWidget(moveXMinusButton);
+        moveLayout->addWidget(moveXPlusButton);
+        moveLayout->addWidget(moveYMinusButton);
+        moveLayout->addWidget(moveYPlusButton);
+        moveLayout->addWidget(moveZMinusButton);
+        moveLayout->addWidget(moveZPlusButton);
+
         QHBoxLayout* navLayout = new QHBoxLayout();
         navLayout->setAlignment(Qt::AlignCenter);
         navLayout->setSpacing(20);
@@ -147,6 +199,8 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         formLayout->addWidget(instructionsView, 0, Qt::AlignCenter);
         formLayout->addSpacing(10);
         formLayout->addLayout(gripLayout);
+        formLayout->addSpacing(10);
+        formLayout->addLayout(moveLayout);
         formLayout->addSpacing(20);
         formLayout->addLayout(navLayout);
 
@@ -225,7 +279,7 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         mainLayout->addLayout(stackedLayout);
     }
 
-    // Styliser tous les boutons
+    // Styliser tous les boutons (sauf les boutons de déplacement déjà stylés)
     {
         QList<QPushButton*> allButtons = {
             startButton, retryButton,
@@ -257,6 +311,16 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         toggleGripperButton->setVisible(step.showGripper);
         rotateLeftButton->setVisible(step.showRotation);
         rotateRightButton->setVisible(step.showRotation);
+
+        // Boutons de déplacement visibles pour toutes les étapes de calibration
+        bool showMovement = step.showGripper || step.showRotation;
+        moveXPlusButton->setVisible(showMovement);
+        moveXMinusButton->setVisible(showMovement);
+        moveYPlusButton->setVisible(showMovement);
+        moveYMinusButton->setVisible(showMovement);
+        moveZPlusButton->setVisible(showMovement);
+        moveZMinusButton->setVisible(showMovement);
+
         testButton->setVisible(step.showTest);
         restartButton->setVisible(step.showRestart);
         menuButton->setVisible(step.showMenu);
@@ -284,6 +348,15 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         menuButton->show();
     });
 
+    // Connexion pour mettre à jour le texte du bouton selon l'état de la pince
+    connect(logic, &CalibrationLogic::gripperStateChanged, this, [this](bool isOpen) {
+        if (isOpen) {
+            toggleGripperButton->setText("Fermer la pince");
+        } else {
+            toggleGripperButton->setText("Ouvrir la pince");
+        }
+    });
+
     // === ANIMATION ===
     fadeAnimation = new QPropertyAnimation(this, "windowOpacity");
     fadeAnimation->setDuration(300);
@@ -296,6 +369,15 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     connect(toggleGripperButton, &QPushButton::clicked, logic, &CalibrationLogic::toggleGripper);
     connect(rotateLeftButton,  &QPushButton::clicked, logic, &CalibrationLogic::rotateLeft);
     connect(rotateRightButton, &QPushButton::clicked, logic, &CalibrationLogic::rotateRight);
+
+    // Connexion des boutons de déplacement fin
+    connect(moveXPlusButton,  &QPushButton::clicked, logic, &CalibrationLogic::moveXPlus);
+    connect(moveXMinusButton, &QPushButton::clicked, logic, &CalibrationLogic::moveXMinus);
+    connect(moveYPlusButton,  &QPushButton::clicked, logic, &CalibrationLogic::moveYPlus);
+    connect(moveYMinusButton, &QPushButton::clicked, logic, &CalibrationLogic::moveYMinus);
+    connect(moveZPlusButton,  &QPushButton::clicked, logic, &CalibrationLogic::moveZPlus);
+    connect(moveZMinusButton, &QPushButton::clicked, logic, &CalibrationLogic::moveZMinus);
+
     connect(testButton, &QPushButton::clicked, this, &CalibrationScreen::onTestClicked);
 
     connect(restartButton, &QPushButton::clicked, this, &CalibrationScreen::onRestartClicked);

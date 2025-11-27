@@ -26,12 +26,14 @@ public:
     bool connect();       // Connecte le robot si un Dobot est détecté
     void disconnect();    // Déconnecte proprement et vide la file de commandes
     static bool isAvailable();   // Vérifie si un Dobot est détectable
+    void clearAlarms();   // Clear toutes les alarmes du robot
 
     // === Mouvements ===
     void Home();                           // Retourne le robot en position Home
     void goTo(Pose p);                     // Déplacement direct (PTP)
     void goToSecurized(Pose p, float safeZ = 150.0f);  // Déplacement sécurisé avec hauteur de sécurité
     void rotate(float delta);              // Rotation relative de la pince
+    void moveAxis(char axis, float delta); // Déplacement relatif sur un axe ('x', 'y', ou 'z')
 
     // === Contrôle de la pince ===
     void openGripper();          // Ouvre la pince
