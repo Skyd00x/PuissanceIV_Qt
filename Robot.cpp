@@ -25,9 +25,13 @@ bool Robot::connect()
     if (ConnectDobot(dobotNameList, 115200, nullptr, nullptr) != DobotConnect_NoError)
         return false;
 
-    // Nettoyage de l’état et démarrage de la file d’exécution
+    // Nettoyage de l'état et démarrage de la file d'exécution
     ClearAllAlarmsState();
     SetQueuedCmdStartExec();
+
+    // Configurer la vitesse normale par défaut
+    setNormalSpeed();
+
     return true;
 }
 
@@ -48,6 +52,45 @@ void Robot::clearAlarms()
 {
     ClearAllAlarmsState();
     qDebug() << "[Robot] Alarmes clearées";
+}
+
+// ============================================================================
+//  Contrôle de la vitesse
+// ============================================================================
+void Robot::setNormalSpeed()
+{
+    // Vitesse normale pour les déplacements rapides
+    PTPCoordinateParams coordParams;
+    coordParams.xyzVelocity = 200.0f;      // mm/s
+    coordParams.xyzAcceleration = 200.0f;  // mm/s²
+    coordParams.rVelocity = 200.0f;        // °/s
+    coordParams.rAcceleration = 200.0f;    // °/s²
+    SetPTPCoordinateParams(&coordParams, false, nullptr);
+
+    PTPCommonParams commonParams;
+    commonParams.velocityRatio = 100;      // 100% de la vitesse
+    commonParams.accelerationRatio = 100;  // 100% de l'accélération
+    SetPTPCommonParams(&commonParams, false, nullptr);
+
+    qDebug() << "[Robot] Vitesse normale activée";
+}
+
+void Robot::setPrecisionSpeed()
+{
+    // Vitesse réduite pour les mouvements de précision
+    PTPCoordinateParams coordParams;
+    coordParams.xyzVelocity = 50.0f;       // mm/s (réduit de 75%)
+    coordParams.xyzAcceleration = 50.0f;   // mm/s² (réduit de 75%)
+    coordParams.rVelocity = 50.0f;         // °/s
+    coordParams.rAcceleration = 50.0f;     // °/s²
+    SetPTPCoordinateParams(&coordParams, false, nullptr);
+
+    PTPCommonParams commonParams;
+    commonParams.velocityRatio = 25;       // 25% de la vitesse
+    commonParams.accelerationRatio = 25;   // 25% de l'accélération
+    SetPTPCommonParams(&commonParams, false, nullptr);
+
+    qDebug() << "[Robot] Vitesse de précision activée (25%)";
 }
 
 // ============================================================================
@@ -74,10 +117,15 @@ void Robot::Home()
 // ============================================================================
 //  Déplacements
 // ============================================================================
-void Robot::goTo(Pose p)
+void Robot::goTo(Pose p, bool precise)
 {
     // Clear les alarmes avant le mouvement pour éviter les blocages
     clearAlarms();
+
+    // Activer la vitesse de précision si demandé
+    if (precise) {
+        setPrecisionSpeed();
+    }
 
     PTPCmd cmd = {0};
     cmd.ptpMode = PTPMOVJXYZMode;
@@ -89,6 +137,11 @@ void Robot::goTo(Pose p)
     uint64_t idx = 0;
     SetPTPCmd(&cmd, false, &idx);
     waitForCompletion(idx);
+
+    // Revenir à la vitesse normale après le mouvement de précision
+    if (precise) {
+        setNormalSpeed();
+    }
 }
 
 void Robot::goToSecurized(Pose target, float safeZ)
@@ -96,27 +149,27 @@ void Robot::goToSecurized(Pose target, float safeZ)
     // === SYSTÈME DE POINTS DE PASSAGE POUR ÉVITER LES COLLISIONS ===
     // 1. Monter à la hauteur de sécurité (safeZ)
     // 2. Se déplacer horizontalement à safeZ
-    // 3. Descendre à la position cible
+    // 3. Descendre LENTEMENT à la position cible pour la précision
 
     // Récupère la pose actuelle
     Pose current;
     GetPose(&current);
 
-    // Étape 1 : Monter à safeZ avec la position actuelle (x, y)
+    // Étape 1 : Monter à safeZ avec la position actuelle (x, y) - vitesse normale
     qDebug() << "[Robot] Étape 1/3 : Montée à z=" << safeZ << " (sécurité)";
     Pose stepUp = current;
     stepUp.z = safeZ;
-    goTo(stepUp);
+    goTo(stepUp, false);  // Vitesse normale
 
-    // Étape 2 : Se déplacer horizontalement au-dessus de la cible à safeZ
+    // Étape 2 : Se déplacer horizontalement au-dessus de la cible à safeZ - vitesse normale
     qDebug() << "[Robot] Étape 2/3 : Déplacement horizontal vers (x=" << target.x << ", y=" << target.y << ", z=" << safeZ << ")";
     Pose stepOver = target;
     stepOver.z = safeZ;
-    goTo(stepOver);
+    goTo(stepOver, false);  // Vitesse normale
 
-    // Étape 3 : Descendre à la position cible finale
-    qDebug() << "[Robot] Étape 3/3 : Descente à z=" << target.z;
-    goTo(target);
+    // Étape 3 : Descendre LENTEMENT à la position cible finale pour éviter l'overshoot
+    qDebug() << "[Robot] Étape 3/3 : Descente PRÉCISE à z=" << target.z;
+    goTo(target, true);  // VITESSE RÉDUITE pour la précision
 
     qDebug() << "[Robot] Déplacement sécurisé terminé";
 }

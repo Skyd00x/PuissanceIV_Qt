@@ -30,10 +30,14 @@ public:
 
     // === Mouvements ===
     void Home();                           // Retourne le robot en position Home
-    void goTo(Pose p);                     // Déplacement direct (PTP)
+    void goTo(Pose p, bool precise = false); // Déplacement direct (PTP), precise = vitesse réduite
     void goToSecurized(Pose p, float safeZ = 150.0f);  // Déplacement sécurisé avec hauteur de sécurité
     void rotate(float delta);              // Rotation relative de la pince
     void moveAxis(char axis, float delta); // Déplacement relatif sur un axe ('x', 'y', ou 'z')
+
+    // === Contrôle de la vitesse ===
+    void setNormalSpeed();                 // Vitesse normale (rapide)
+    void setPrecisionSpeed();              // Vitesse réduite pour la précision
 
     // === Contrôle de la pince ===
     void openGripper();          // Ouvre la pince

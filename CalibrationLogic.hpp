@@ -56,13 +56,18 @@ public:
     void rotateLeft();
     void rotateRight();
 
-    // Déplacements fins sur les axes (par pas de 0.1mm)
+    // Déplacements fins sur les axes (par pas de 1mm)
     void moveXPlus();
     void moveXMinus();
     void moveYPlus();
     void moveYMinus();
     void moveZPlus();
     void moveZMinus();
+
+    // Déplacements automatiques vers les zones de calibration
+    void goToLeftReservoirArea();
+    void goToRightReservoirArea();
+    void goToGridArea();
 
     void saveCalibration(const QString& path);
     void loadCalibration(const QString& path);

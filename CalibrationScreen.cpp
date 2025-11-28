@@ -22,7 +22,7 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
 
     // === BARRE DE PROGRESSION ===
     progressBar = new QProgressBar(this);
-    progressBar->setRange(0, 7);
+    progressBar->setRange(0, 15);
     progressBar->setValue(0);
     progressBar->setFixedSize(900, 25);
     progressBar->setTextVisible(true);
@@ -128,6 +128,11 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         rotateLeftButton   = new QPushButton("↺ Tourner gauche");
         rotateRightButton  = new QPushButton("↻ Tourner droite");
 
+        // Boutons de déplacement automatique vers les zones
+        goToLeftReservoirButton  = new QPushButton("→ Réservoir gauche");
+        goToRightReservoirButton = new QPushButton("→ Réservoir droit");
+        goToGridButton           = new QPushButton("→ Grille");
+
         // Boutons de déplacement fin
         moveXPlusButton  = new QPushButton("X+");
         moveXMinusButton = new QPushButton("X-");
@@ -179,6 +184,14 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         gripLayout->addWidget(rotateLeftButton);
         gripLayout->addWidget(rotateRightButton);
 
+        // Layout pour les boutons de déplacement automatique par zone
+        QHBoxLayout* zoneLayout = new QHBoxLayout();
+        zoneLayout->setAlignment(Qt::AlignCenter);
+        zoneLayout->setSpacing(10);
+        zoneLayout->addWidget(goToLeftReservoirButton);
+        zoneLayout->addWidget(goToRightReservoirButton);
+        zoneLayout->addWidget(goToGridButton);
+
         // Layout pour les boutons de déplacement fin
         QHBoxLayout* moveLayout = new QHBoxLayout();
         moveLayout->setAlignment(Qt::AlignCenter);
@@ -199,7 +212,9 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         formLayout->addWidget(instructionsView, 0, Qt::AlignCenter);
         formLayout->addSpacing(10);
         formLayout->addLayout(gripLayout);
-        formLayout->addSpacing(10);
+        formLayout->addSpacing(5);
+        formLayout->addLayout(zoneLayout);
+        formLayout->addSpacing(5);
         formLayout->addLayout(moveLayout);
         formLayout->addSpacing(20);
         formLayout->addLayout(navLayout);
@@ -285,6 +300,7 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
             startButton, retryButton,
             nextButton, backButton,
             toggleGripperButton, rotateLeftButton, rotateRightButton,
+            goToLeftReservoirButton, goToRightReservoirButton, goToGridButton,
             testButton, restartButton, menuButton
         };
         for (auto *b : allButtons) {
@@ -321,6 +337,11 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         moveZPlusButton->setVisible(showMovement);
         moveZMinusButton->setVisible(showMovement);
 
+        // Boutons de zone visibles pendant la calibration
+        goToLeftReservoirButton->setVisible(showMovement);
+        goToRightReservoirButton->setVisible(showMovement);
+        goToGridButton->setVisible(showMovement);
+
         testButton->setVisible(step.showTest);
         restartButton->setVisible(step.showRestart);
         menuButton->setVisible(step.showMenu);
@@ -335,8 +356,8 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     connect(logic, &CalibrationLogic::calibrationTestFinished, this, [this]() {
         loadingMovie->stop();
         loadingLabel->hide();
-        progressBar->setRange(0, 7);
-        progressBar->setValue(7);
+        progressBar->setRange(0, 15);
+        progressBar->setValue(15);
 
         endLabel->setText(
             "Calibration terminée.<br>"
@@ -377,6 +398,11 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     connect(moveYMinusButton, &QPushButton::clicked, logic, &CalibrationLogic::moveYMinus);
     connect(moveZPlusButton,  &QPushButton::clicked, logic, &CalibrationLogic::moveZPlus);
     connect(moveZMinusButton, &QPushButton::clicked, logic, &CalibrationLogic::moveZMinus);
+
+    // Connexion des boutons de déplacement automatique par zone
+    connect(goToLeftReservoirButton,  &QPushButton::clicked, logic, &CalibrationLogic::goToLeftReservoirArea);
+    connect(goToRightReservoirButton, &QPushButton::clicked, logic, &CalibrationLogic::goToRightReservoirArea);
+    connect(goToGridButton,           &QPushButton::clicked, logic, &CalibrationLogic::goToGridArea);
 
     connect(testButton, &QPushButton::clicked, this, &CalibrationScreen::onTestClicked);
 
@@ -556,7 +582,7 @@ void CalibrationScreen::prepareIntroUI(const QString& message) {
     introLabel->setText(message);
     startButton->hide();
     retryButton->hide();
-    progressBar->setRange(0, 7);
+    progressBar->setRange(0, 15);
     progressBar->setValue(0);
 
     loadingMovie->stop();
@@ -707,7 +733,7 @@ void CalibrationScreen::onQuitButtonClicked() {
     qDebug() << "[CalibrationScreen] Déconnexion et reset de la calibration...";
     logic->disconnectToRobot();
     currentStep = 0;
-    progressBar->setRange(0, 7);
+    progressBar->setRange(0, 15);
     progressBar->setValue(0);
     progressBar->hide();
     loadingMovie->stop();
@@ -727,7 +753,7 @@ void CalibrationScreen::resetCalibration() {
     currentStep = 0;
 
     // Reset UI
-    progressBar->setRange(0, 7);
+    progressBar->setRange(0, 15);
     progressBar->setValue(0);
     progressBar->hide();
 

@@ -120,6 +120,11 @@ private:
     QPushButton* moveZPlusButton;
     QPushButton* moveZMinusButton;
 
+    // Boutons de déplacement automatique vers les zones
+    QPushButton* goToLeftReservoirButton;
+    QPushButton* goToRightReservoirButton;
+    QPushButton* goToGridButton;
+
     QLabel* endLabel;
     QPushButton* testButton;
     QPushButton* restartButton;
