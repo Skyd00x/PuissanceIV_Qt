@@ -11,9 +11,9 @@
 #define DEBUG_VISIONAI     0
 #define DEBUG_INTRO        0
 #define DEBUG_CHECK        0
-#define DEBUG_MENU         0
+#define DEBUG_MENU         1
 #define DEBUG_GAME         0
-#define DEBUG_CALIBRATION  1
+#define DEBUG_CALIBRATION  0
 #define DEBUG_ROBOT_TEST   0
 
 int main(int argc, char *argv[])

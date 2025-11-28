@@ -253,6 +253,52 @@ void Robot::moveAxis(char axis, float delta)
     waitForCompletion(idx);
 }
 
+uint64_t Robot::moveAxisContinuous(char axis, float delta)
+{
+    // Version non-bloquante pour mouvements continus (retourne l'index de la commande)
+    // Récupère la pose actuelle
+    Pose p;
+    GetPose(&p);
+
+    // Applique le delta sur l'axe spécifié
+    switch (axis) {
+        case 'x':
+        case 'X':
+            p.x += delta;
+            break;
+        case 'y':
+        case 'Y':
+            p.y += delta;
+            break;
+        case 'z':
+        case 'Z':
+            p.z += delta;
+            break;
+        default:
+            return 0;
+    }
+
+    // Envoie de la commande SANS bloquer
+    PTPCmd cmd = {0};
+    cmd.ptpMode = PTPMOVJXYZMode;
+    cmd.x = p.x;
+    cmd.y = p.y;
+    cmd.z = p.z;
+    cmd.r = p.r;
+
+    uint64_t idx = 0;
+    SetPTPCmd(&cmd, false, &idx);  // false = ne pas clear la queue
+    return idx;  // Retourne l'index pour vérifier la complétion
+}
+
+bool Robot::isCommandCompleted(uint64_t commandIndex)
+{
+    // Vérifie si une commande est terminée
+    uint64_t currentIndex = 0;
+    GetQueuedCmdCurrentIndex(&currentIndex);
+    return currentIndex >= commandIndex;
+}
+
 // ============================================================================
 //  Gripper
 // ============================================================================

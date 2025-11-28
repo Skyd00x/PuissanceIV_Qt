@@ -5,6 +5,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QFile>
+#include <QTimer>
 #include <vector>
 #include <array>
 #include <atomic>
@@ -64,6 +65,10 @@ public:
     void moveZPlus();
     void moveZMinus();
 
+    // Déplacements continus (pour mode "joystick")
+    void startContinuousMove(char axis, float delta);
+    void stopContinuousMove();
+
     // Déplacements automatiques vers les zones de calibration
     void goToLeftReservoirArea();
     void goToRightReservoirArea();
@@ -87,6 +92,9 @@ public:
     // Hauteur de sécurité calculée d'après les points calibrés (max z + 30)
     float getSafeHeight() const;
 
+    // Point générique d'un réservoir (moyenne entre position 1 et 4)
+    Pose getReservoirGenericPoint(bool isLeftReservoir) const;
+
     // === Fonctions de haut niveau pour manipuler les pions ===
     // Prendre un pion à une position de réservoir (Left_1..Left_4 ou Right_1..Right_4)
     void pickPiece(CalibPoint reservoirPosition);
@@ -105,8 +113,9 @@ signals:
 
 private:
     std::vector<Pose> interpolatePoints(const Pose& start, const Pose& end, int count);
-    void computeAllPositions();
+    void computeIntermediatePositions();  // Calcule les positions intermédiaires à partir des points clé
 
+    Pose getGridGenericPoint() const;
 private:
     Robot* robot;
     bool connected;
@@ -121,4 +130,10 @@ private:
 
     // Nouveau : tableau indexé par CalibPoint
     std::array<Pose, (int)CalibPoint::Count> calibratedPoints;
+
+    // Mouvement continu (joystick)
+    QTimer* continuousMoveTimer;
+    char currentAxis;
+    float currentDelta;
+    uint64_t lastMoveCommandIndex;  // Index de la dernière commande envoyée
 };

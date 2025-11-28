@@ -6,51 +6,52 @@
 #include <cmath>
 
 CalibrationLogic::CalibrationLogic(Robot* robot, QObject* parent)
-    : QObject(parent), robot(robot), connected(false), stepIndex(0), gripperOpen(false), shouldStop_(false)
+    : QObject(parent), robot(robot), connected(false), stepIndex(0), gripperOpen(false), shouldStop_(false),
+      currentAxis('x'), currentDelta(0.0f), lastMoveCommandIndex(0)
 {
+    // Initialiser le timer pour les mouvements continus
+    continuousMoveTimer = new QTimer(this);
+    continuousMoveTimer->setInterval(50);  // 50ms entre chaque mouvement (20 Hz)
+    connect(continuousMoveTimer, &QTimer::timeout, this, [this]() {
+        if (this->connected && this->robot) {
+            // Vérifier si la commande précédente est terminée avant d'envoyer la suivante
+            if (this->lastMoveCommandIndex == 0 || this->robot->isCommandCompleted(this->lastMoveCommandIndex)) {
+                // Envoyer une nouvelle commande et stocker son index
+                this->lastMoveCommandIndex = this->robot->moveAxisContinuous(this->currentAxis, this->currentDelta);
+            }
+            // Sinon, on attend le prochain tick du timer
+        }
+    });
+
     steps = {
         // Étape 0 : Instructions initiales
-        { "Videz les réservoirs, puis placez un pion dans le réservoir de gauche à l'emplacement 1.",
+        { "Videz les réservoirs, puis placez un pion dans le réservoir de gauche à l'emplacement 1.<br>"
+         "<b>Calibration optimisée</b> : vous ne calibrerez que les points clés (1 et 4 de chaque zone), "
+         "les positions intermédiaires seront calculées automatiquement.",
          "./Ressources/image/Calibration/Etape1.png", true, false, false, false, false, false, false },
 
-        // Étapes 1-4 : Réservoir gauche
-        { "Positionnez le robot à l'emplacement 1 du réservoir de gauche.",
+        // Étapes 1-2 : Réservoir gauche (seulement 1 et 4)
+        { "Positionnez le robot à l'emplacement <b>1</b> du réservoir de gauche (premier pion).",
          "./Ressources/image/Calibration/Etape2.png", true, true, true, true, false, false, false },
-        { "Positionnez le robot à l'emplacement 2 du réservoir de gauche.",
-         "./Ressources/image/Calibration/Etape2.png", true, true, true, true, false, false, false },
-        { "Positionnez le robot à l'emplacement 3 du réservoir de gauche.",
-         "./Ressources/image/Calibration/Etape2.png", true, true, true, true, false, false, false },
-        { "Positionnez le robot à l'emplacement 4 du réservoir de gauche.",
+        { "Positionnez le robot à l'emplacement <b>4</b> du réservoir de gauche (dernier pion).",
          "./Ressources/image/Calibration/Etape3.png", true, true, true, true, false, false, false },
 
-        // Étapes 5-8 : Réservoir droit
-        { "Positionnez le robot à l'emplacement 1 du réservoir de droite.",
+        // Étapes 3-4 : Réservoir droit (seulement 1 et 4)
+        { "Positionnez le robot à l'emplacement <b>1</b> du réservoir de droite (premier pion).",
          "./Ressources/image/Calibration/Etape4.png", true, true, true, true, false, false, false },
-        { "Positionnez le robot à l'emplacement 2 du réservoir de droite.",
-         "./Ressources/image/Calibration/Etape4.png", true, true, true, true, false, false, false },
-        { "Positionnez le robot à l'emplacement 3 du réservoir de droite.",
-         "./Ressources/image/Calibration/Etape4.png", true, true, true, true, false, false, false },
-        { "Positionnez le robot à l'emplacement 4 du réservoir de droite.",
+        { "Positionnez le robot à l'emplacement <b>4</b> du réservoir de droite (dernier pion).",
          "./Ressources/image/Calibration/Etape5.png", true, true, true, true, false, false, false },
 
-        // Étapes 9-15 : Grille colonnes 1-7
-        { "Positionnez le robot à la colonne 1 de la grille (tout à gauche).",
+        // Étapes 5-6 : Grille (seulement colonnes 1 et 7)
+        { "Positionnez le robot à la <b>colonne 1</b> de la grille (tout à gauche).",
          "./Ressources/image/Calibration/Etape6.png", true, true, true, true, false, false, false },
-        { "Positionnez le robot à la colonne 2 de la grille.",
-         "./Ressources/image/Calibration/Etape6.png", true, true, true, true, false, false, false },
-        { "Positionnez le robot à la colonne 3 de la grille.",
-         "./Ressources/image/Calibration/Etape6.png", true, true, true, true, false, false, false },
-        { "Positionnez le robot à la colonne 4 de la grille (centre).",
-         "./Ressources/image/Calibration/Etape6.png", true, true, true, true, false, false, false },
-        { "Positionnez le robot à la colonne 5 de la grille.",
-         "./Ressources/image/Calibration/Etape7.png", true, true, true, true, false, false, false },
-        { "Positionnez le robot à la colonne 6 de la grille.",
-         "./Ressources/image/Calibration/Etape7.png", true, true, true, true, false, false, false },
-        { "Positionnez le robot à la colonne 7 de la grille (tout à droite).",
+        { "Positionnez le robot à la <b>colonne 7</b> de la grille (tout à droite).",
          "./Ressources/image/Calibration/Etape7.png", true, true, true, true, false, false, false },
 
-        // Étape 16 : Fin
-        { "Calibration terminée.<br>Vous pouvez maintenant tester les positions, recommencer ou quitter.",
+        // Étape 7 : Fin
+        { "Calibration terminée !<br>"
+         "Les positions intermédiaires (2, 3, 4, 5, 6) ont été calculées automatiquement.<br>"
+         "Vous pouvez maintenant tester les positions, recommencer ou quitter.",
          "./Ressources/image/welcome_calibration.png", false, false, false, false, true, true, true }
     };
 
@@ -138,19 +139,34 @@ void CalibrationLogic::recordStep(int index) {
     Pose p;
     GetPose(&p);
 
-    // Enregistrer directement dans calibratedPoints
-    // index 1-15 correspondent aux CalibPoint 0-14
-    int calibPointIndex = index - 1;
+    // Mapping des étapes vers les indices de calibratedPoints
+    // Système optimisé : on ne calibre que 6 points clés (2 par zone)
+    int calibPointIndex = -1;
+    switch (index) {
+        case 1: calibPointIndex = (int)CalibPoint::Left_1;   break;  // Étape 1 → Left_1
+        case 2: calibPointIndex = (int)CalibPoint::Left_4;   break;  // Étape 2 → Left_4
+        case 3: calibPointIndex = (int)CalibPoint::Right_1;  break;  // Étape 3 → Right_1
+        case 4: calibPointIndex = (int)CalibPoint::Right_4;  break;  // Étape 4 → Right_4
+        case 5: calibPointIndex = (int)CalibPoint::Grid_1;   break;  // Étape 5 → Grid_1
+        case 6: calibPointIndex = (int)CalibPoint::Grid_7;   break;  // Étape 6 → Grid_7
+        default: break;
+    }
+
     if (calibPointIndex >= 0 && calibPointIndex < (int)CalibPoint::Count) {
         calibratedPoints[calibPointIndex] = p;
-        qDebug() << "[CalibrationLogic] Position" << calibPointIndex << "enregistrée : x=" << p.x << "y=" << p.y << "z=" << p.z << "r=" << p.r;
+        qDebug() << "[CalibrationLogic] Position clé" << calibPointIndex << "enregistrée : x=" << p.x << "y=" << p.y << "z=" << p.z << "r=" << p.r;
     }
 
     emit progressChanged(index);
 
-    // Dernière étape (index 15 = Grid_7) = fin de calibration
-    if (index == 15) {
+    // Dernière étape (index 6) = calculer les positions intermédiaires puis sauvegarder
+    if (index == 6) {
+        qDebug() << "[CalibrationLogic] Calcul des positions intermédiaires...";
+        computeIntermediatePositions();
         saveCalibration("./calibration.json");
+
+        // Mettre la barre de progression à 100%
+        emit progressChanged(7);
         emit calibrationFinished();
     }
 
@@ -207,38 +223,42 @@ std::vector<Pose> CalibrationLogic::interpolatePoints(const Pose& start, const P
 }
 
 // ================================================
-//   Génération des 15 points calibrés
-//   NOTE: Cette fonction n'est plus utilisée depuis la nouvelle calibration
-//         qui enregistre directement tous les 15 points sans interpolation.
-//         Conservée pour compatibilité avec anciennes versions.
+//   Calcul des positions intermédiaires
+//   Interpolation linéaire à partir des points clés calibrés
 // ================================================
-void CalibrationLogic::computeAllPositions() {
-    // Cette fonction n'est plus utilisée avec la nouvelle méthode de calibration
-    return;
+void CalibrationLogic::computeIntermediatePositions() {
+    qDebug() << "[CalibrationLogic] Calcul des positions intermédiaires par interpolation";
 
-    Pose left1  = calibrationData[1].pose;
-    Pose left4  = calibrationData[2].pose;
-    Pose right1 = calibrationData[3].pose;
-    Pose right4 = calibrationData[4].pose;
-    Pose grid1  = calibrationData[5].pose;
-    Pose grid7  = calibrationData[6].pose;
+    // 1️⃣ Réservoir gauche : interpoler Left_2 et Left_3 entre Left_1 et Left_4
+    Pose left1 = calibratedPoints[(int)CalibPoint::Left_1];
+    Pose left4 = calibratedPoints[(int)CalibPoint::Left_4];
+    auto leftReservoir = interpolatePoints(left1, left4, 4);
+    for (int i = 0; i < 4; i++) {
+        calibratedPoints[(int)CalibPoint::Left_1 + i] = leftReservoir[i];
+        qDebug() << "  Left_" << (i+1) << ": x=" << leftReservoir[i].x << " y=" << leftReservoir[i].y << " z=" << leftReservoir[i].z;
+    }
 
-    // 1️⃣ Réserve gauche
-    auto L = interpolatePoints(left1, left4, 4);
-    for (int i = 0; i < 4; i++)
-        calibratedPoints[(int)CalibPoint::Left_1 + i] = L[i];
+    // 2️⃣ Réservoir droit : interpoler Right_2 et Right_3 entre Right_1 et Right_4
+    Pose right1 = calibratedPoints[(int)CalibPoint::Right_1];
+    Pose right4 = calibratedPoints[(int)CalibPoint::Right_4];
+    auto rightReservoir = interpolatePoints(right1, right4, 4);
+    for (int i = 0; i < 4; i++) {
+        calibratedPoints[(int)CalibPoint::Right_1 + i] = rightReservoir[i];
+        qDebug() << "  Right_" << (i+1) << ": x=" << rightReservoir[i].x << " y=" << rightReservoir[i].y << " z=" << rightReservoir[i].z;
+    }
 
-    // 2️⃣ Réserve droite
-    auto R = interpolatePoints(right1, right4, 4);
-    for (int i = 0; i < 4; i++)
-        calibratedPoints[(int)CalibPoint::Right_1 + i] = R[i];
+    // 3️⃣ Grille : interpoler les colonnes 2, 3, 4, 5, 6 entre Grid_1 et Grid_7
+    Pose grid1 = calibratedPoints[(int)CalibPoint::Grid_1];
+    Pose grid7 = calibratedPoints[(int)CalibPoint::Grid_7];
 
-    // 3️⃣ Colonnes de grille (7)
-    auto G = interpolatePoints(grid1, grid7, 7);
-    for (int i = 0; i < 7; i++)
-        calibratedPoints[(int)CalibPoint::Grid_1 + i] = G[i];
+    // Interpoler entre Grid_1 et Grid_7 pour obtenir toutes les colonnes (1 à 7)
+    auto gridColumns = interpolatePoints(grid1, grid7, 7);  // 7 points : 1, 2, 3, 4, 5, 6, 7
+    for (int i = 0; i < 7; i++) {
+        calibratedPoints[(int)CalibPoint::Grid_1 + i] = gridColumns[i];
+        qDebug() << "  Grid_" << (i+1) << ": x=" << gridColumns[i].x << " y=" << gridColumns[i].y << " z=" << gridColumns[i].z;
+    }
 
-    saveCalibration("./calibration.json");
+    qDebug() << "[CalibrationLogic] Toutes les positions intermédiaires ont été calculées";
 }
 
 // === Test des positions ===
@@ -322,31 +342,59 @@ void CalibrationLogic::moveYMinus() { if (connected && robot) robot->moveAxis('y
 void CalibrationLogic::moveZPlus()  { if (connected && robot) robot->moveAxis('z', +1.0f); }
 void CalibrationLogic::moveZMinus() { if (connected && robot) robot->moveAxis('z', -1.0f); }
 
+// === Déplacements continus (mode "joystick") ===
+void CalibrationLogic::startContinuousMove(char axis, float delta) {
+    if (!connected || !robot) return;
+
+    currentAxis = axis;
+    currentDelta = delta;
+
+    // Démarrer le timer qui va répéter le mouvement
+    if (!continuousMoveTimer->isActive()) {
+        continuousMoveTimer->start();
+    }
+}
+
+void CalibrationLogic::stopContinuousMove() {
+    // Arrêter le timer
+    if (continuousMoveTimer->isActive()) {
+        continuousMoveTimer->stop();
+    }
+    // Réinitialiser l'index de la dernière commande
+    lastMoveCommandIndex = 0;
+}
+
+// === Helper pour obtenir le point générique de la grille ===
+Pose CalibrationLogic::getGridGenericPoint() const {
+    Pose gridGeneric;
+
+    // Valeurs par défaut pour la grille (votre configuration)
+    gridGeneric.x = 241.0f;
+    gridGeneric.y = 6.0f;
+    gridGeneric.z = 104.0f;
+    gridGeneric.r = 3.2f;
+
+    return gridGeneric;
+}
+
 // === Déplacements automatiques vers les zones de calibration ===
 void CalibrationLogic::goToLeftReservoirArea() {
     if (!connected || !robot) return;
 
     Pose target;
 
-    // Si la calibration existe déjà, utiliser la moyenne entre Left_1 et Left_4
-    if (calibratedPoints[(int)CalibPoint::Left_1].x != 0 || calibratedPoints[(int)CalibPoint::Left_4].x != 0) {
-        Pose left1 = calibratedPoints[(int)CalibPoint::Left_1];
-        Pose left4 = calibratedPoints[(int)CalibPoint::Left_4];
+    // Valeurs par défaut pour le réservoir gauche (votre configuration)
+    target.x = 29.5f;
+    target.y = -220.3f;
+    target.z = -70.0f;
+    target.r = -80.0f;
 
-        target.x = (left1.x + left4.x) / 2.0f;
-        target.y = (left1.y + left4.y) / 2.0f;
-        target.z = (left1.z + left4.z) / 2.0f;
-        target.r = (left1.r + left4.r) / 2.0f;
-    } else {
-        // Valeurs par défaut pour le réservoir gauche (votre configuration)
-        target.x = 29.5f;
-        target.y = -220.3f;
-        target.z = -70.0f;
-        target.r = -80.0f;
-    }
+    // IMPORTANT : Utiliser le Z du point générique de la grille comme hauteur de sécurité
+    Pose gridGeneric = getGridGenericPoint();
+    float gridZ = gridGeneric.z;
 
-    qDebug() << "[CalibrationLogic] Déplacement vers réservoir gauche : x=" << target.x << "y=" << target.y << "z=" << target.z;
-    robot->goToSecurized(target, getSafeHeight());
+    qDebug() << "[CalibrationLogic] Déplacement vers réservoir gauche avec hauteur grille z=" << gridZ;
+    robot->goToSecurized(target, gridZ);
 }
 
 void CalibrationLogic::goToRightReservoirArea() {
@@ -354,51 +402,31 @@ void CalibrationLogic::goToRightReservoirArea() {
 
     Pose target;
 
-    // Si la calibration existe déjà, utiliser la moyenne entre Right_1 et Right_4
-    if (calibratedPoints[(int)CalibPoint::Right_1].x != 0 || calibratedPoints[(int)CalibPoint::Right_4].x != 0) {
-        Pose right1 = calibratedPoints[(int)CalibPoint::Right_1];
-        Pose right4 = calibratedPoints[(int)CalibPoint::Right_4];
+    // Valeurs par défaut pour le réservoir droit (votre configuration)
+    target.x = 16.5f;
+    target.y = 222.0f;
+    target.z = -70.0f;
+    target.r = 95.2f;
 
-        target.x = (right1.x + right4.x) / 2.0f;
-        target.y = (right1.y + right4.y) / 2.0f;
-        target.z = (right1.z + right4.z) / 2.0f;
-        target.r = (right1.r + right4.r) / 2.0f;
-    } else {
-        // Valeurs par défaut pour le réservoir droit (votre configuration)
-        target.x = 16.5f;
-        target.y = 222.0f;
-        target.z = -70.0f;
-        target.r = 95.2f;
-    }
+    // IMPORTANT : Utiliser le Z du point générique de la grille comme hauteur de sécurité
+    Pose gridGeneric = getGridGenericPoint();
+    float gridZ = gridGeneric.z;
 
-    qDebug() << "[CalibrationLogic] Déplacement vers réservoir droit : x=" << target.x << "y=" << target.y << "z=" << target.z;
-    robot->goToSecurized(target, getSafeHeight());
+    qDebug() << "[CalibrationLogic] Déplacement vers réservoir droit avec hauteur grille z=" << gridZ;
+    robot->goToSecurized(target, gridZ);
 }
 
 void CalibrationLogic::goToGridArea() {
     if (!connected || !robot) return;
 
-    Pose target;
-
-    // Si la calibration existe déjà, utiliser la moyenne entre Grid_1 et Grid_7
-    if (calibratedPoints[(int)CalibPoint::Grid_1].x != 0 || calibratedPoints[(int)CalibPoint::Grid_7].x != 0) {
-        Pose grid1 = calibratedPoints[(int)CalibPoint::Grid_1];
-        Pose grid7 = calibratedPoints[(int)CalibPoint::Grid_7];
-
-        target.x = (grid1.x + grid7.x) / 2.0f;
-        target.y = (grid1.y + grid7.y) / 2.0f;
-        target.z = (grid1.z + grid7.z) / 2.0f;
-        target.r = (grid1.r + grid7.r) / 2.0f;
-    } else {
-        // Valeurs par défaut pour la grille (votre configuration)
-        target.x = 241.0f;
-        target.y = 6.0f;
-        target.z = 104.0f;
-        target.r = 3.2f;
-    }
+    // Obtenir le point générique de la grille
+    Pose target = getGridGenericPoint();
 
     qDebug() << "[CalibrationLogic] Déplacement vers grille : x=" << target.x << "y=" << target.y << "z=" << target.z;
-    robot->goToSecurized(target, getSafeHeight());
+
+    // Utiliser le Z du point générique de la grille comme hauteur de sécurité
+    float gridZ = target.z;
+    robot->goToSecurized(target, gridZ);
 }
 
 // === Sauvegarde ===
@@ -473,22 +501,68 @@ Pose CalibrationLogic::getPoseForColumn(int col) const {
 }
 
 float CalibrationLogic::getSafeHeight() const {
-    // Parcourir tous les points calibrés pour trouver le z maximum
+    // IMPORTANT: La hauteur de sécurité doit TOUJOURS être basée sur les points de la grille,
+    // car c'est le point le plus haut du parcours normal du robot.
+    // Parcourir UNIQUEMENT les points de la grille (Grid_1 à Grid_7)
     float maxZ = -1000.0f;  // Valeur très basse pour commencer
 
-    for (int i = 0; i < (int)CalibPoint::Count; i++) {
+    for (int i = (int)CalibPoint::Grid_1; i <= (int)CalibPoint::Grid_7; i++) {
         if (calibratedPoints[i].z > maxZ) {
             maxZ = calibratedPoints[i].z;
         }
     }
 
-    // Si aucun point n'a été trouvé (calibration vide), utiliser une valeur par défaut
+    // Si aucun point de grille n'a été trouvé (calibration vide), utiliser une valeur par défaut
     if (maxZ < -999.0f) {
         return 150.0f;
     }
 
-    // Retourner le z max + 30 pour la sécurité
+    // Retourner le z max de la grille + 30 pour la sécurité
     return maxZ + 30.0f;
+}
+
+Pose CalibrationLogic::getReservoirGenericPoint(bool isLeftReservoir) const {
+    Pose genericPoint;
+
+    if (isLeftReservoir) {
+        // Point générique du réservoir gauche : moyenne entre Left_1 et Left_4
+        // EXACTEMENT comme dans goToLeftReservoirArea()
+        if (calibratedPoints[(int)CalibPoint::Left_1].x != 0 || calibratedPoints[(int)CalibPoint::Left_4].x != 0) {
+            Pose left1 = calibratedPoints[(int)CalibPoint::Left_1];
+            Pose left4 = calibratedPoints[(int)CalibPoint::Left_4];
+
+            genericPoint.x = (left1.x + left4.x) / 2.0f;
+            genericPoint.y = (left1.y + left4.y) / 2.0f;
+            genericPoint.z = (left1.z + left4.z) / 2.0f;
+            genericPoint.r = (left1.r + left4.r) / 2.0f;
+        } else {
+            // Valeurs par défaut pour le réservoir gauche
+            genericPoint.x = 29.5f;
+            genericPoint.y = -220.3f;
+            genericPoint.z = -70.0f;
+            genericPoint.r = -80.0f;
+        }
+    } else {
+        // Point générique du réservoir droit : moyenne entre Right_1 et Right_4
+        // EXACTEMENT comme dans goToRightReservoirArea()
+        if (calibratedPoints[(int)CalibPoint::Right_1].x != 0 || calibratedPoints[(int)CalibPoint::Right_4].x != 0) {
+            Pose right1 = calibratedPoints[(int)CalibPoint::Right_1];
+            Pose right4 = calibratedPoints[(int)CalibPoint::Right_4];
+
+            genericPoint.x = (right1.x + right4.x) / 2.0f;
+            genericPoint.y = (right1.y + right4.y) / 2.0f;
+            genericPoint.z = (right1.z + right4.z) / 2.0f;
+            genericPoint.r = (right1.r + right4.r) / 2.0f;
+        } else {
+            // Valeurs par défaut pour le réservoir droit
+            genericPoint.x = 16.5f;
+            genericPoint.y = 222.0f;
+            genericPoint.z = -70.0f;
+            genericPoint.r = 95.2f;
+        }
+    }
+
+    return genericPoint;
 }
 
 // =====================================================
@@ -524,6 +598,14 @@ void CalibrationLogic::pickPiece(CalibPoint reservoirPosition) {
 
     // Petite pause pour s'assurer que le pion est bien attrapé
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+    // IMPORTANT: Remonter doucement de 30mm sur Z pour extraire le pion de l'emplacement
+    Pose currentPose;
+    GetPose(&currentPose);
+    currentPose.z += 30.0f;
+
+    qDebug() << "[CalibrationLogic] Extraction du pion : remontée de 30mm à z=" << currentPose.z;
+    robot->goTo(currentPose, true);  // true = mouvement de précision (lent)
 }
 
 void CalibrationLogic::dropPiece(int column) {

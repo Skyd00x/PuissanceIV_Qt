@@ -22,7 +22,7 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
 
     // === BARRE DE PROGRESSION ===
     progressBar = new QProgressBar(this);
-    progressBar->setRange(0, 15);
+    progressBar->setRange(0, 7);
     progressBar->setValue(0);
     progressBar->setFixedSize(900, 25);
     progressBar->setTextVisible(true);
@@ -356,8 +356,8 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     connect(logic, &CalibrationLogic::calibrationTestFinished, this, [this]() {
         loadingMovie->stop();
         loadingLabel->hide();
-        progressBar->setRange(0, 15);
-        progressBar->setValue(15);
+        progressBar->setRange(0, 7);
+        progressBar->setValue(7);
 
         endLabel->setText(
             "Calibration terminée.<br>"
@@ -391,13 +391,25 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     connect(rotateLeftButton,  &QPushButton::clicked, logic, &CalibrationLogic::rotateLeft);
     connect(rotateRightButton, &QPushButton::clicked, logic, &CalibrationLogic::rotateRight);
 
-    // Connexion des boutons de déplacement fin
-    connect(moveXPlusButton,  &QPushButton::clicked, logic, &CalibrationLogic::moveXPlus);
-    connect(moveXMinusButton, &QPushButton::clicked, logic, &CalibrationLogic::moveXMinus);
-    connect(moveYPlusButton,  &QPushButton::clicked, logic, &CalibrationLogic::moveYPlus);
-    connect(moveYMinusButton, &QPushButton::clicked, logic, &CalibrationLogic::moveYMinus);
-    connect(moveZPlusButton,  &QPushButton::clicked, logic, &CalibrationLogic::moveZPlus);
-    connect(moveZMinusButton, &QPushButton::clicked, logic, &CalibrationLogic::moveZMinus);
+    // Connexion des boutons de déplacement fin en mode "joystick" (mouvement continu tant que maintenu)
+    // 3mm par mouvement toutes les 50ms = 60 mm/s, moins d'à-coups
+    connect(moveXPlusButton,  &QPushButton::pressed, this, [this]() { logic->startContinuousMove('x', +3.0f); });
+    connect(moveXPlusButton,  &QPushButton::released, logic, &CalibrationLogic::stopContinuousMove);
+
+    connect(moveXMinusButton, &QPushButton::pressed, this, [this]() { logic->startContinuousMove('x', -3.0f); });
+    connect(moveXMinusButton, &QPushButton::released, logic, &CalibrationLogic::stopContinuousMove);
+
+    connect(moveYPlusButton,  &QPushButton::pressed, this, [this]() { logic->startContinuousMove('y', +3.0f); });
+    connect(moveYPlusButton,  &QPushButton::released, logic, &CalibrationLogic::stopContinuousMove);
+
+    connect(moveYMinusButton, &QPushButton::pressed, this, [this]() { logic->startContinuousMove('y', -3.0f); });
+    connect(moveYMinusButton, &QPushButton::released, logic, &CalibrationLogic::stopContinuousMove);
+
+    connect(moveZPlusButton,  &QPushButton::pressed, this, [this]() { logic->startContinuousMove('z', +3.0f); });
+    connect(moveZPlusButton,  &QPushButton::released, logic, &CalibrationLogic::stopContinuousMove);
+
+    connect(moveZMinusButton, &QPushButton::pressed, this, [this]() { logic->startContinuousMove('z', -3.0f); });
+    connect(moveZMinusButton, &QPushButton::released, logic, &CalibrationLogic::stopContinuousMove);
 
     // Connexion des boutons de déplacement automatique par zone
     connect(goToLeftReservoirButton,  &QPushButton::clicked, logic, &CalibrationLogic::goToLeftReservoirArea);
@@ -582,7 +594,7 @@ void CalibrationScreen::prepareIntroUI(const QString& message) {
     introLabel->setText(message);
     startButton->hide();
     retryButton->hide();
-    progressBar->setRange(0, 15);
+    progressBar->setRange(0, 7);
     progressBar->setValue(0);
 
     loadingMovie->stop();
@@ -733,7 +745,7 @@ void CalibrationScreen::onQuitButtonClicked() {
     qDebug() << "[CalibrationScreen] Déconnexion et reset de la calibration...";
     logic->disconnectToRobot();
     currentStep = 0;
-    progressBar->setRange(0, 15);
+    progressBar->setRange(0, 7);
     progressBar->setValue(0);
     progressBar->hide();
     loadingMovie->stop();
@@ -753,7 +765,7 @@ void CalibrationScreen::resetCalibration() {
     currentStep = 0;
 
     // Reset UI
-    progressBar->setRange(0, 15);
+    progressBar->setRange(0, 7);
     progressBar->setValue(0);
     progressBar->hide();
 

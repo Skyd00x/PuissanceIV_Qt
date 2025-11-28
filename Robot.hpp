@@ -34,6 +34,8 @@ public:
     void goToSecurized(Pose p, float safeZ = 150.0f);  // Déplacement sécurisé avec hauteur de sécurité
     void rotate(float delta);              // Rotation relative de la pince
     void moveAxis(char axis, float delta); // Déplacement relatif sur un axe ('x', 'y', ou 'z')
+    uint64_t moveAxisContinuous(char axis, float delta); // Version non-bloquante, retourne l'index de la commande
+    bool isCommandCompleted(uint64_t commandIndex);      // Vérifie si une commande est terminée
 
     // === Contrôle de la vitesse ===
     void setNormalSpeed();                 // Vitesse normale (rapide)

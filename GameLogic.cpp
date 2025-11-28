@@ -100,14 +100,6 @@ void GameLogic::prepareGame()
             std::this_thread::sleep_for(std::chrono::milliseconds(300));
             robot->turnOffGripper();  // Couper le compresseur pour réduire le bruit
 
-            // Positionner le robot au-dessus du premier pion (Left_1)
-            qDebug() << "[GameLogic] Positionnement au-dessus du premier pion (Left_1)...";
-            CalibPoint firstPiece = CalibPoint::Left_1;
-            Pose firstPose = calib->getPosition(firstPiece);
-            float safeZ = calib->getSafeHeight();
-            robot->goToSecurized(firstPose, safeZ);
-            qDebug() << "[GameLogic] Robot positionné au-dessus du pion Left_1";
-
             // Vérifier que la pince est bien fermée (état initial avant le début de la partie)
             qDebug() << "[GameLogic] Vérification de l'état de la pince : fermée";
 
@@ -209,6 +201,16 @@ void GameLogic::stopGame()
         negamaxThreadObj = nullptr;
     }
 
+    // Ouvrir puis fermer la pince pour lâcher tout pion éventuel
+    if (robot && robotConnected) {
+        qDebug() << "[GameLogic] Ouverture et fermeture de la pince...";
+        robot->openGripper();
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        robot->closeGripper();
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        robot->turnOffGripper();  // Couper le compresseur
+    }
+
     // Ne pas déconnecter le robot pour éviter de refaire Home() à chaque partie
     // La déconnexion se fera à la fermeture de l'application
     qDebug() << "[GameLogic] === PARTIE ARRÊTÉE ===";
@@ -287,36 +289,50 @@ void GameLogic::onGridUpdated(const QVector<QVector<int>>& g)
         }
     }
 
-    // Détection de triche au tour du joueur
+    // Détection de triche au tour du joueur (avec compteur pour éviter faux positifs)
     if (currentTurn == PlayerTurn) {
         if (newPiecesCount > 1) {
-            camera->stop();
-            emit cheatDetected("TRICHE DÉTECTÉE\nPlusieurs pions ont été ajoutés en même temps !");
-            gameRunning = false;
-            return;
+            cheatMultiplePiecesCount++;
+            if (cheatMultiplePiecesCount >= CHEAT_CONFIRM_THRESHOLD) {
+                camera->stop();
+                emit cheatDetected("TRICHE DÉTECTÉE\nPlusieurs pions ont été ajoutés en même temps !");
+                gameRunning = false;
+                return;
+            }
+        } else {
+            cheatMultiplePiecesCount = 0;  // Réinitialiser si plus de triche
         }
+
         if (newRobotPieces > 0) {
-            camera->stop();
-            emit cheatDetected("TRICHE DÉTECTÉE\nMauvaise couleur de pion !\nVous devez jouer avec les pions " +
-                             QString(playerColor == 1 ? "rouges" : "jaunes"));
-            gameRunning = false;
-            return;
+            cheatWrongColorCount++;
+            if (cheatWrongColorCount >= CHEAT_CONFIRM_THRESHOLD) {
+                camera->stop();
+                emit cheatDetected("TRICHE DÉTECTÉE\nMauvaise couleur de pion !\nVous devez jouer avec les pions " +
+                                 QString(playerColor == 1 ? "rouges" : "jaunes"));
+                gameRunning = false;
+                return;
+            }
+        } else {
+            cheatWrongColorCount = 0;  // Réinitialiser si plus de triche
         }
     }
 
-    // Détection de triche pendant l'attente de détection du robot
+    // Détection de triche pendant l'attente de détection du robot (avec compteur)
     if (currentTurn == WaitingForRobotDetection) {
-        if (newPiecesCount > 1) {
-            camera->stop();
-            emit cheatDetected("TRICHE DÉTECTÉE\nPions ajoutés pendant le tour du robot !");
-            gameRunning = false;
-            return;
-        }
-        if (newPlayerPieces > 0) {
-            camera->stop();
-            emit cheatDetected("TRICHE DÉTECTÉE\nPion du joueur ajouté pendant le tour du robot !");
-            gameRunning = false;
-            return;
+        if (newPiecesCount > 1 || newPlayerPieces > 0) {
+            cheatDuringRobotCount++;
+            if (cheatDuringRobotCount >= CHEAT_CONFIRM_THRESHOLD) {
+                camera->stop();
+                if (newPiecesCount > 1) {
+                    emit cheatDetected("TRICHE DÉTECTÉE\nPions ajoutés pendant le tour du robot !");
+                } else {
+                    emit cheatDetected("TRICHE DÉTECTÉE\nPion du joueur ajouté pendant le tour du robot !");
+                }
+                gameRunning = false;
+                return;
+            }
+        } else {
+            cheatDuringRobotCount = 0;  // Réinitialiser si plus de triche
         }
     }
 
@@ -388,24 +404,42 @@ void GameLogic::onGridUpdated(const QVector<QVector<int>>& g)
         {
             qDebug() << "[GameLogic] Pion du robot détecté !";
 
-            // Maintenant qu'on a détecté le pion, aller au-dessus du prochain pion
-            CalibPoint nextPos;
+            // Maintenant qu'on a détecté le pion, lancer un thread pour aller au point générique du prochain réservoir
             bool hasNextPiece = false;
+            bool isLeftReservoir = false;
 
             if (leftReservoirPieces > 0) {
-                nextPos = static_cast<CalibPoint>((int)CalibPoint::Left_1 + currentLeftIndex);
+                isLeftReservoir = true;
                 hasNextPiece = true;
             } else if (rightReservoirPieces > 0) {
-                nextPos = static_cast<CalibPoint>((int)CalibPoint::Right_1 + currentRightIndex);
+                isLeftReservoir = false;
                 hasNextPiece = true;
             }
 
             if (hasNextPiece) {
-                qDebug() << "[GameLogic] Déplacement au-dessus du prochain pion à la position" << (int)nextPos;
-                emit robotStatus("Se repositionne au-dessus du prochain pion");
-                Pose nextPose = calib->getPosition(nextPos);
-                float safeZ = calib->getSafeHeight();
-                robot->goToSecurized(nextPose, safeZ);
+                qDebug() << "[GameLogic] Lancement du repositionnement au réservoir" << (isLeftReservoir ? "gauche" : "droit");
+                emit robotStatus(QString("Se repositionne au réservoir %1").arg(isLeftReservoir ? "gauche" : "droit"));
+
+                // Lancer le repositionnement dans un thread pour ne pas bloquer l'UI
+                QThread* repositionThread = QThread::create([this, isLeftReservoir]() {
+                    qDebug() << "[GameLogic] Thread de repositionnement démarré";
+
+                    // Aller au point générique du réservoir (pas à la position exacte du pion)
+                    Pose genericPose = calib->getReservoirGenericPoint(isLeftReservoir);
+                    float safeZ = calib->getSafeHeight();
+
+                    qDebug() << "[GameLogic] Point générique" << (isLeftReservoir ? "GAUCHE" : "DROIT")
+                             << ": x=" << genericPose.x << " y=" << genericPose.y
+                             << " z=" << genericPose.z << " r=" << genericPose.r;
+                    qDebug() << "[GameLogic] Hauteur de sécurité: z=" << safeZ;
+
+                    robot->goToSecurized(genericPose, safeZ);
+
+                    qDebug() << "[GameLogic] Repositionnement terminé";
+                });
+
+                connect(repositionThread, &QThread::finished, repositionThread, &QThread::deleteLater);
+                repositionThread->start();
             }
 
             qDebug() << "[GameLogic] Passage au tour du joueur";
@@ -538,12 +572,8 @@ void GameLogic::runNegamax(int depth)
         qDebug() << "[GameLogic] Récupère le pion à la position" << (int)pickPos;
 
         emit robotStatus("Récupère le pion");
-        // Ouvrir la pince avant de prendre le pion
-        robot->openGripper();
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
-        robot->turnOffGripper();  // Couper le compresseur
 
-        // Prendre le pion dans le réservoir (fonction de haut niveau)
+        // Prendre le pion dans le réservoir (fonction de haut niveau qui gère tout)
         calib->pickPiece(pickPos);
         qDebug() << "[GameLogic] Pion récupéré";
 
