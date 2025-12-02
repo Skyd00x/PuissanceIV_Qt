@@ -193,7 +193,7 @@ std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR)
     at::Tensor conf, labels;
     std::tie(conf, labels) = cls_scores.max(1);
 
-    const float confTh = 0.90f;  // Filtrer les prédictions < 90% de confiance
+    const float confTh = 0.7f;  // Filtrer les prédictions < 90% de confiance
     at::Tensor keep = conf > confTh;
     boxes_xywh = boxes_xywh.index({keep});
     conf = conf.index({keep});

@@ -22,6 +22,7 @@ public:
 signals:
     void startGame(StateMachine::Difficulty difficulty, StateMachine::PlayerColor color);
     void startCalibration();
+    void startCalibrationTest();
     void openExplanation();
     void quitGame();
 
@@ -56,6 +57,7 @@ private:
     QLabel *titleLabel;
     QPushButton *launchButton;
     QPushButton *calibrationButton;
+    QPushButton *testCalibrationButton;
     QPushButton *quitButton;
 
     // Difficultés

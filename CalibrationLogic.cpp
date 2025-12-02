@@ -26,7 +26,7 @@ CalibrationLogic::CalibrationLogic(Robot* robot, QObject* parent)
     steps = {
         // Étape 0 : Instructions initiales
         { "Videz les réservoirs, puis placez un pion dans le réservoir de gauche à l'emplacement 1.<br>"
-         "<b>Calibration optimisée</b> : vous ne calibrerez que les points clés (1 et 4 de chaque zone), "
+         "<b>Calibration optimisée</b> : vous calibrerez les points clés (1 et 4 de chaque réservoir, 1, 4 et 7 de la grille), "
          "les positions intermédiaires seront calculées automatiquement.",
          "./Ressources/image/Calibration/Etape1.png", true, false, false, false, false, false, false },
 
@@ -42,17 +42,19 @@ CalibrationLogic::CalibrationLogic(Robot* robot, QObject* parent)
         { "Positionnez le robot à l'emplacement <b>4</b> du réservoir de droite (dernier pion).",
          "./Ressources/image/Calibration/Etape5.png", true, true, true, true, false, false, false },
 
-        // Étapes 5-6 : Grille (seulement colonnes 1 et 7)
+        // Étapes 5-7 : Grille (colonnes 1, 4 et 7 pour précision maximale)
         { "Positionnez le robot à la <b>colonne 1</b> de la grille (tout à gauche).",
+         "./Ressources/image/Calibration/Etape6.png", true, true, true, true, false, false, false },
+        { "Positionnez le robot à la <b>colonne 4</b> de la grille (centre).",
          "./Ressources/image/Calibration/Etape6.png", true, true, true, true, false, false, false },
         { "Positionnez le robot à la <b>colonne 7</b> de la grille (tout à droite).",
          "./Ressources/image/Calibration/Etape7.png", true, true, true, true, false, false, false },
 
-        // Étape 7 : Fin
+        // Étape 8 : Fin
         { "Calibration terminée !<br>"
-         "Les positions intermédiaires (2, 3, 4, 5, 6) ont été calculées automatiquement.<br>"
-         "Vous pouvez maintenant tester les positions, recommencer ou quitter.",
-         "./Ressources/image/welcome_calibration.png", false, false, false, false, true, true, true }
+         "Les positions intermédiaires ont été calculées automatiquement.<br>"
+         "Vous pouvez maintenant recommencer ou retourner au menu principal.",
+         "./Ressources/image/welcome_calibration.png", false, false, false, false, false, true, true }
     };
 
     // Charger les positions calibrées si elles existent
@@ -140,7 +142,7 @@ void CalibrationLogic::recordStep(int index) {
     GetPose(&p);
 
     // Mapping des étapes vers les indices de calibratedPoints
-    // Système optimisé : on ne calibre que 6 points clés (2 par zone)
+    // Système optimisé : on calibre 7 points clés (2 par réservoir, 3 pour la grille)
     int calibPointIndex = -1;
     switch (index) {
         case 1: calibPointIndex = (int)CalibPoint::Left_1;   break;  // Étape 1 → Left_1
@@ -148,7 +150,8 @@ void CalibrationLogic::recordStep(int index) {
         case 3: calibPointIndex = (int)CalibPoint::Right_1;  break;  // Étape 3 → Right_1
         case 4: calibPointIndex = (int)CalibPoint::Right_4;  break;  // Étape 4 → Right_4
         case 5: calibPointIndex = (int)CalibPoint::Grid_1;   break;  // Étape 5 → Grid_1
-        case 6: calibPointIndex = (int)CalibPoint::Grid_7;   break;  // Étape 6 → Grid_7
+        case 6: calibPointIndex = (int)CalibPoint::Grid_4;   break;  // Étape 6 → Grid_4 (centre)
+        case 7: calibPointIndex = (int)CalibPoint::Grid_7;   break;  // Étape 7 → Grid_7
         default: break;
     }
 
@@ -159,14 +162,14 @@ void CalibrationLogic::recordStep(int index) {
 
     emit progressChanged(index);
 
-    // Dernière étape (index 6) = calculer les positions intermédiaires puis sauvegarder
-    if (index == 6) {
+    // Dernière étape (index 7) = calculer les positions intermédiaires puis sauvegarder
+    if (index == 7) {
         qDebug() << "[CalibrationLogic] Calcul des positions intermédiaires...";
         computeIntermediatePositions();
         saveCalibration("./calibration.json");
 
         // Mettre la barre de progression à 100%
-        emit progressChanged(7);
+        emit progressChanged(8);
         emit calibrationFinished();
     }
 
@@ -247,18 +250,27 @@ void CalibrationLogic::computeIntermediatePositions() {
         qDebug() << "  Right_" << (i+1) << ": x=" << rightReservoir[i].x << " y=" << rightReservoir[i].y << " z=" << rightReservoir[i].z;
     }
 
-    // 3️⃣ Grille : interpoler les colonnes 2, 3, 4, 5, 6 entre Grid_1 et Grid_7
+    // 3️⃣ Grille : interpoler en deux fois (1-4 et 4-7) pour plus de précision
     Pose grid1 = calibratedPoints[(int)CalibPoint::Grid_1];
+    Pose grid4 = calibratedPoints[(int)CalibPoint::Grid_4];
     Pose grid7 = calibratedPoints[(int)CalibPoint::Grid_7];
 
-    // Interpoler entre Grid_1 et Grid_7 pour obtenir toutes les colonnes (1 à 7)
-    auto gridColumns = interpolatePoints(grid1, grid7, 7);  // 7 points : 1, 2, 3, 4, 5, 6, 7
-    for (int i = 0; i < 7; i++) {
-        calibratedPoints[(int)CalibPoint::Grid_1 + i] = gridColumns[i];
-        qDebug() << "  Grid_" << (i+1) << ": x=" << gridColumns[i].x << " y=" << gridColumns[i].y << " z=" << gridColumns[i].z;
+    // Interpoler entre Grid_1 et Grid_4 pour obtenir les colonnes 1, 2, 3, 4
+    auto gridLeft = interpolatePoints(grid1, grid4, 4);  // 4 points : 1, 2, 3, 4
+    for (int i = 0; i < 4; i++) {
+        calibratedPoints[(int)CalibPoint::Grid_1 + i] = gridLeft[i];
+        qDebug() << "  Grid_" << (i+1) << ": x=" << gridLeft[i].x << " y=" << gridLeft[i].y << " z=" << gridLeft[i].z;
     }
 
-    qDebug() << "[CalibrationLogic] Toutes les positions intermédiaires ont été calculées";
+    // Interpoler entre Grid_4 et Grid_7 pour obtenir les colonnes 4, 5, 6, 7
+    auto gridRight = interpolatePoints(grid4, grid7, 4);  // 4 points : 4, 5, 6, 7
+    // Ne pas réécrire Grid_4 (déjà fait), commencer à i=1 pour Grid_5
+    for (int i = 1; i < 4; i++) {
+        calibratedPoints[(int)CalibPoint::Grid_4 + i] = gridRight[i];
+        qDebug() << "  Grid_" << (i+4) << ": x=" << gridRight[i].x << " y=" << gridRight[i].y << " z=" << gridRight[i].z;
+    }
+
+    qDebug() << "[CalibrationLogic] Toutes les positions intermédiaires ont été calculées (précision améliorée)";
 }
 
 // === Test des positions ===

@@ -22,7 +22,7 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
 
     // === BARRE DE PROGRESSION ===
     progressBar = new QProgressBar(this);
-    progressBar->setRange(0, 7);
+    progressBar->setRange(0, 8);  // 8 étapes au total (0-7 + fin)
     progressBar->setValue(0);
     progressBar->setFixedSize(900, 25);
     progressBar->setTextVisible(true);
@@ -235,8 +235,8 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         endLayout->setContentsMargins(100, 80, 100, 80);
 
         endLabel = new QLabel(
-            "Calibration terminée.<br>"
-            "Vous pouvez maintenant tester les positions, recommencer la calibration ou revenir au menu principal.",
+            "Calibration terminée !<br>"
+            "Vous pouvez maintenant recommencer la calibration ou retourner au menu principal.",
             this
             );
         endLabel->setAlignment(Qt::AlignCenter);
@@ -245,13 +245,11 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         endLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
         endLabel->setMinimumWidth(900);
 
-        testButton = new QPushButton("Tester toutes les positions");
         restartButton = new QPushButton("Recommencer");
         menuButton = new QPushButton("Retour au menu principal");
 
         endLayout->addWidget(endLabel, 0, Qt::AlignCenter);
         endLayout->addSpacing(30);
-        endLayout->addWidget(testButton, 0, Qt::AlignCenter);
         endLayout->addWidget(restartButton, 0, Qt::AlignCenter);
         endLayout->addWidget(menuButton, 0, Qt::AlignCenter);
         stackedLayout->addWidget(endWidget);
@@ -301,7 +299,7 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
             nextButton, backButton,
             toggleGripperButton, rotateLeftButton, rotateRightButton,
             goToLeftReservoirButton, goToRightReservoirButton, goToGridButton,
-            testButton, restartButton, menuButton
+            restartButton, menuButton
         };
         for (auto *b : allButtons) {
             styleButton(b);
@@ -342,7 +340,6 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         goToRightReservoirButton->setVisible(showMovement);
         goToGridButton->setVisible(showMovement);
 
-        testButton->setVisible(step.showTest);
         restartButton->setVisible(step.showRestart);
         menuButton->setVisible(step.showMenu);
         currentStep = index;
@@ -356,15 +353,14 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     connect(logic, &CalibrationLogic::calibrationTestFinished, this, [this]() {
         loadingMovie->stop();
         loadingLabel->hide();
-        progressBar->setRange(0, 7);
-        progressBar->setValue(7);
+        progressBar->setRange(0, 8);
+        progressBar->setValue(8);
 
         endLabel->setText(
             "Calibration terminée.<br>"
-            "Vous pouvez maintenant tester les positions, recommencer la calibration ou revenir au menu principal."
+            "Vous pouvez maintenant recommencer la calibration ou revenir au menu principal."
             );
 
-        testButton->show();
         restartButton->show();
         menuButton->show();
     });
@@ -415,8 +411,6 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     connect(goToLeftReservoirButton,  &QPushButton::clicked, logic, &CalibrationLogic::goToLeftReservoirArea);
     connect(goToRightReservoirButton, &QPushButton::clicked, logic, &CalibrationLogic::goToRightReservoirArea);
     connect(goToGridButton,           &QPushButton::clicked, logic, &CalibrationLogic::goToGridArea);
-
-    connect(testButton, &QPushButton::clicked, this, &CalibrationScreen::onTestClicked);
 
     connect(restartButton, &QPushButton::clicked, this, &CalibrationScreen::onRestartClicked);
 
@@ -536,22 +530,6 @@ void CalibrationScreen::onBackClicked() {
     logic->previousStep();
 }
 
-void CalibrationScreen::onTestClicked() {
-    testButton->hide();
-    restartButton->hide();
-    menuButton->hide();
-    progressBar->setRange(0, 100);
-    progressBar->setValue(0);
-
-    endLabel->setText("<b>Test des positions calibrées en cours...</b>");
-    loadingLabel->show();
-    loadingMovie->start();
-
-    QTimer::singleShot(100, [this]() {
-        logic->testCalibration();
-    });
-}
-
 void CalibrationScreen::onRestartClicked() {
     logic->resetCalibration();
     currentStep = 0;
@@ -594,7 +572,7 @@ void CalibrationScreen::prepareIntroUI(const QString& message) {
     introLabel->setText(message);
     startButton->hide();
     retryButton->hide();
-    progressBar->setRange(0, 7);
+    progressBar->setRange(0, 8);
     progressBar->setValue(0);
 
     loadingMovie->stop();
@@ -745,7 +723,7 @@ void CalibrationScreen::onQuitButtonClicked() {
     qDebug() << "[CalibrationScreen] Déconnexion et reset de la calibration...";
     logic->disconnectToRobot();
     currentStep = 0;
-    progressBar->setRange(0, 7);
+    progressBar->setRange(0, 8);
     progressBar->setValue(0);
     progressBar->hide();
     loadingMovie->stop();
@@ -765,7 +743,7 @@ void CalibrationScreen::resetCalibration() {
     currentStep = 0;
 
     // Reset UI
-    progressBar->setRange(0, 7);
+    progressBar->setRange(0, 8);
     progressBar->setValue(0);
     progressBar->hide();
 

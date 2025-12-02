@@ -39,6 +39,7 @@ set(PROJECT_SOURCES
     IntroScreen.cpp IntroScreen.hpp
     CheckDevicesScreen.cpp CheckDevicesScreen.hpp
     CalibrationScreen.cpp CalibrationScreen.hpp
+    CalibrationTestScreen.cpp CalibrationTestScreen.hpp
     ExplanationScreen.cpp ExplanationScreen.hpp
     CalibrationLogic.cpp CalibrationLogic.hpp
     ${TS_FILES}

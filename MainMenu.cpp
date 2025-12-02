@@ -109,9 +109,10 @@ void MainMenu::createMainMenu()
 
     launchButton = new QPushButton("Lancer une partie");
     calibrationButton = new QPushButton("Calibration");
+    testCalibrationButton = new QPushButton("Tester la calibration");
     quitButton = new QPushButton("Quitter le jeu");
 
-    QList<QPushButton*> buttons = {launchButton, calibrationButton, quitButton};
+    QList<QPushButton*> buttons = {launchButton, calibrationButton, testCalibrationButton, quitButton};
     for (auto *b : buttons) {
         b->setFixedSize(buttonWidth, buttonHeight);
         b->setStyleSheet(
@@ -159,6 +160,7 @@ void MainMenu::createMainMenu()
     connect(calibrationButton, &QPushButton::clicked, [this]() {
         showConfirmationMenu("Voulez-vous lancer la calibration du robot ?", ConfirmationType::Calibration);
     });
+    connect(testCalibrationButton, &QPushButton::clicked, this, &MainMenu::startCalibrationTest);
     connect(quitButton, &QPushButton::clicked, [this]() {
         showConfirmationMenu("Êtes-vous sûr de vouloir quitter le jeu ?", ConfirmationType::Quit);
     });

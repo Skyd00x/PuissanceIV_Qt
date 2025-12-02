@@ -25,6 +25,9 @@ MainWindow::MainWindow(QWidget *parent)
     // ❗ Correction : on passe robot, pas "this"
     calibrationScreen = new CalibrationScreen(robot, this);
 
+    // Écran de test de calibration (nécessite robot et CalibrationLogic)
+    calibrationTestScreen = new CalibrationTestScreen(robot, calibrationScreen->getCalibrationLogic(), this);
+
     explanationScreen = new ExplanationScreen(this);
     gameScreen        = new GameScreen(this);
 
@@ -33,6 +36,7 @@ MainWindow::MainWindow(QWidget *parent)
     stack->addWidget(checkScreen);
     stack->addWidget(mainMenu);
     stack->addWidget(calibrationScreen);
+    stack->addWidget(calibrationTestScreen);
     stack->addWidget(explanationScreen);
     stack->addWidget(gameScreen);
 
@@ -123,6 +127,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(mainMenu, &MainMenu::startCalibration,
             this, &MainWindow::showCalibration);
 
+    connect(mainMenu, &MainMenu::startCalibrationTest,
+            this, &MainWindow::showCalibrationTest);
+
     connect(mainMenu, &MainMenu::openExplanation,
             this, &MainWindow::showExplanation);
 
@@ -148,6 +155,21 @@ MainWindow::MainWindow(QWidget *parent)
             qDebug() << "[MainWindow] Début du reset de la calibration";
             calibrationScreen->resetCalibration();
             qDebug() << "[MainWindow] Reset de la calibration terminé";
+        });
+    });
+
+    // === CONNEXIONS CALIBRATION TEST ===
+    connect(calibrationTestScreen, &CalibrationTestScreen::backToMenuRequested, this, [this]() {
+        qDebug() << "[MainWindow] Retour au menu depuis le test de calibration";
+
+        // Informer GameLogic que le robot peut avoir été déconnecté
+        gameLogic->resetRobotConnection();
+
+        showMenu();
+
+        // Reset de l'écran de test après transition
+        QTimer::singleShot(100, [this]() {
+            calibrationTestScreen->resetScreen();
         });
     });
 
@@ -208,6 +230,12 @@ void MainWindow::showMenu()
 void MainWindow::showCalibration()
 {
     stack->setCurrentWidget(calibrationScreen);
+}
+
+void MainWindow::showCalibrationTest()
+{
+    calibrationTestScreen->resetScreen();
+    stack->setCurrentWidget(calibrationTestScreen);
 }
 
 void MainWindow::showExplanation()

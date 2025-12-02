@@ -12,6 +12,7 @@
 #include "CheckDevicesScreen.hpp"
 #include "MainMenu.hpp"
 #include "CalibrationScreen.hpp"
+#include "CalibrationTestScreen.hpp"
 #include "ExplanationScreen.hpp"
 
 #include "GameScreen.hpp"
@@ -30,8 +31,9 @@ public:
     void showCheck();
     void showMenu();
     void showCalibration();
+    void showCalibrationTest();
     void showExplanation();
-    void showGame();        // ← ajouté
+    void showGame();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -49,6 +51,7 @@ private:
     CheckDevicesScreen *checkScreen       = nullptr;
     MainMenu           *mainMenu          = nullptr;
     CalibrationScreen  *calibrationScreen = nullptr;
+    CalibrationTestScreen *calibrationTestScreen = nullptr;
     ExplanationScreen  *explanationScreen = nullptr;
 
     GameScreen         *gameScreen        = nullptr;

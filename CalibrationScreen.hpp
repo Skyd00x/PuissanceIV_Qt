@@ -49,7 +49,6 @@ public slots:
     void onStartClicked();
     void onNextClicked();
     void onBackClicked();
-    void onTestClicked();
     void onRestartClicked();
 
     void attemptConnection();
@@ -126,7 +125,6 @@ private:
     QPushButton* goToGridButton;
 
     QLabel* endLabel;
-    QPushButton* testButton;
     QPushButton* restartButton;
     QPushButton* menuButton;
 };

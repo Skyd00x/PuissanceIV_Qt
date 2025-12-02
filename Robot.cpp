@@ -77,20 +77,20 @@ void Robot::setNormalSpeed()
 
 void Robot::setPrecisionSpeed()
 {
-    // Vitesse réduite pour les mouvements de précision
+    // Vitesse très réduite pour les mouvements de précision (descente au-dessus de la grille/pion)
     PTPCoordinateParams coordParams;
-    coordParams.xyzVelocity = 50.0f;       // mm/s (réduit de 75%)
-    coordParams.xyzAcceleration = 50.0f;   // mm/s² (réduit de 75%)
-    coordParams.rVelocity = 50.0f;         // °/s
-    coordParams.rAcceleration = 50.0f;     // °/s²
+    coordParams.xyzVelocity = 30.0f;       // mm/s (réduit de 85%)
+    coordParams.xyzAcceleration = 30.0f;   // mm/s² (réduit de 85%)
+    coordParams.rVelocity = 30.0f;         // °/s
+    coordParams.rAcceleration = 30.0f;     // °/s²
     SetPTPCoordinateParams(&coordParams, false, nullptr);
 
     PTPCommonParams commonParams;
-    commonParams.velocityRatio = 25;       // 25% de la vitesse
-    commonParams.accelerationRatio = 25;   // 25% de l'accélération
+    commonParams.velocityRatio = 15;       // 15% de la vitesse (très lent)
+    commonParams.accelerationRatio = 15;   // 15% de l'accélération
     SetPTPCommonParams(&commonParams, false, nullptr);
 
-    qDebug() << "[Robot] Vitesse de précision activée (25%)";
+    qDebug() << "[Robot] Vitesse de précision activée (15% - très lent pour précision maximale)";
 }
 
 // ============================================================================
