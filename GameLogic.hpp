@@ -48,6 +48,7 @@ signals:
     void cheatDetected(QString reason); // Triche détectée
     void reservoirEmpty();             // Réservoirs vides
     void gameResult(QString winner, QString difficulty, int totalSeconds);  // Fin de partie (victoire/égalité)
+    void connectionFailed();           // Échec de connexion au robot (avec possibilité de réessayer)
 
 private:
     enum Turn { PlayerTurn, RobotTurn, WaitingForRobotDetection };

@@ -132,9 +132,11 @@ void CameraAI::processLoop()
             if (frame.empty())
                 continue;
 
+            // Effectuer l'inférence directement sur la frame complète (sans cropping)
             auto dets = inferTorch(frame);
             updateGrid(dets);
 
+            // Afficher la frame complète avec les détections
             emit frameReady(matToQImage(frame));
 
             QThread::msleep(30);
@@ -143,6 +145,85 @@ void CameraAI::processLoop()
     catch (const std::exception& e) {
         qWarning() << "[AI] ❌ Exception:" << e.what();
     }
+}
+
+cv::Mat CameraAI::extractBlueGrid(const cv::Mat& frame)
+{
+    if (frame.empty())
+        return frame;
+
+    // 1. Conversion en HSV pour détecter la couleur bleue
+    cv::Mat hsv;
+    cv::cvtColor(frame, hsv, cv::COLOR_BGR2HSV);
+
+    // 2. Définir les seuils pour la couleur bleue (teinte H ~100-130)
+    // Ces valeurs peuvent nécessiter un ajustement selon l'éclairage
+    cv::Scalar lowerBlue(90, 50, 50);     // H, S, V minimums
+    cv::Scalar upperBlue(130, 255, 255);  // H, S, V maximums
+
+    // 3. Créer un masque binaire pour la couleur bleue
+    cv::Mat mask;
+    cv::inRange(hsv, lowerBlue, upperBlue, mask);
+
+    // 4. Opérations morphologiques pour nettoyer le masque
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
+    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);  // Fermer les trous
+    cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kernel);   // Enlever le bruit
+
+    // 5. Trouver les contours
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+    if (contours.empty())
+        return frame;  // Pas de grille détectée, retourner l'image originale
+
+    // 6. Trouver le plus grand contour (qui devrait être la grille)
+    double maxArea = 0;
+    int maxIdx = -1;
+    for (size_t i = 0; i < contours.size(); ++i) {
+        double area = cv::contourArea(contours[i]);
+        if (area > maxArea) {
+            maxArea = area;
+            maxIdx = (int)i;
+        }
+    }
+
+    if (maxIdx == -1 || maxArea < 10000)  // Seuil minimum de taille pour éviter les faux positifs
+        return frame;
+
+    // 7. Obtenir le rectangle englobant
+    cv::Rect boundingBox = cv::boundingRect(contours[maxIdx]);
+
+    // 8. Ajouter une petite marge (5%) pour s'assurer de capturer toute la grille
+    int margin = std::min(boundingBox.width, boundingBox.height) * 0.05;
+    boundingBox.x = std::max(0, boundingBox.x - margin);
+    boundingBox.y = std::max(0, boundingBox.y - margin);
+    boundingBox.width = std::min(frame.cols - boundingBox.x, boundingBox.width + 2 * margin);
+    boundingBox.height = std::min(frame.rows - boundingBox.y, boundingBox.height + 2 * margin);
+
+    // 9. Extraire la région d'intérêt (crop)
+    cv::Mat gridROI = frame(boundingBox).clone();
+
+    // 10. Augmenter fortement la saturation pour renforcer les couleurs
+    cv::Mat hsvROI;
+    cv::cvtColor(gridROI, hsvROI, cv::COLOR_BGR2HSV);
+
+    // Séparer les canaux H, S, V
+    std::vector<cv::Mat> hsvChannels;
+    cv::split(hsvROI, hsvChannels);
+
+    // Augmenter la saturation (S) de 100% (doublement) pour rendre les couleurs très vives
+    hsvChannels[1] = hsvChannels[1] * 2.0;
+    cv::threshold(hsvChannels[1], hsvChannels[1], 255, 255, cv::THRESH_TRUNC);
+
+    // Recombiner les canaux
+    cv::merge(hsvChannels, hsvROI);
+
+    // Reconvertir en BGR
+    cv::Mat result;
+    cv::cvtColor(hsvROI, result, cv::COLOR_HSV2BGR);
+
+    return result;
 }
 
 std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR)
@@ -193,7 +274,7 @@ std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR)
     at::Tensor conf, labels;
     std::tie(conf, labels) = cls_scores.max(1);
 
-    const float confTh = 0.7f;  // Filtrer les prédictions < 90% de confiance
+    const float confTh = 0.1f;  // Filtrer les prédictions < 90% de confiance
     at::Tensor keep = conf > confTh;
     boxes_xywh = boxes_xywh.index({keep});
     conf = conf.index({keep});

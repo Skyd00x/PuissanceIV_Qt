@@ -122,7 +122,8 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
             );
         instructionsView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
         instructionsView->setMinimumWidth(750);
-        instructionsView->setMaximumHeight(100);
+        instructionsView->setMinimumHeight(120);
+        instructionsView->setMaximumHeight(180);
 
         toggleGripperButton = new QPushButton("Ouvrir la pince");  // État initial : pince fermée
         rotateLeftButton   = new QPushButton("↺ Tourner gauche");
@@ -388,11 +389,11 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     connect(rotateRightButton, &QPushButton::clicked, logic, &CalibrationLogic::rotateRight);
 
     // Connexion des boutons de déplacement fin en mode "joystick" (mouvement continu tant que maintenu)
-    // 3mm par mouvement toutes les 50ms = 60 mm/s, moins d'à-coups
-    connect(moveXPlusButton,  &QPushButton::pressed, this, [this]() { logic->startContinuousMove('x', +3.0f); });
+    // 1.5mm pour X (précision), 3mm pour Y/Z (rapidité) toutes les 50ms
+    connect(moveXPlusButton,  &QPushButton::pressed, this, [this]() { logic->startContinuousMove('x', +1.5f); });
     connect(moveXPlusButton,  &QPushButton::released, logic, &CalibrationLogic::stopContinuousMove);
 
-    connect(moveXMinusButton, &QPushButton::pressed, this, [this]() { logic->startContinuousMove('x', -3.0f); });
+    connect(moveXMinusButton, &QPushButton::pressed, this, [this]() { logic->startContinuousMove('x', -1.5f); });
     connect(moveXMinusButton, &QPushButton::released, logic, &CalibrationLogic::stopContinuousMove);
 
     connect(moveYPlusButton,  &QPushButton::pressed, this, [this]() { logic->startContinuousMove('y', +3.0f); });

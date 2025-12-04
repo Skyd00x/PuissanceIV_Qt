@@ -116,6 +116,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(gameLogic, &GameLogic::gameResult,
             gameScreen, &GameScreen::showGameResult);
 
+    connect(gameLogic, &GameLogic::connectionFailed,
+            gameScreen, &GameScreen::showConnectionError);
+
     // === CONNEXIONS DU MENU ===
     connect(mainMenu, &MainMenu::startGame,
             [&](StateMachine::Difficulty diff, StateMachine::PlayerColor color){

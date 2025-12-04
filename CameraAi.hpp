@@ -47,6 +47,7 @@ private slots:
 
 private:
     void initializeCamera(int camIndex);  // Initialise et démarre dans le workerThread
+    cv::Mat extractBlueGrid(const cv::Mat& frame);  // Extrait la grille bleue de l'image
     std::vector<Detection> inferTorch(const cv::Mat& frame);
     void updateGrid(const std::vector<Detection>& dets);
     QImage matToQImage(const cv::Mat& mat);

@@ -149,26 +149,34 @@ void Robot::goToSecurized(Pose target, float safeZ)
     // === SYSTÈME DE POINTS DE PASSAGE POUR ÉVITER LES COLLISIONS ===
     // 1. Monter à la hauteur de sécurité (safeZ)
     // 2. Se déplacer horizontalement à safeZ
-    // 3. Descendre LENTEMENT à la position cible pour la précision
+    // 3. Descendre RAPIDEMENT jusqu'à 15mm au-dessus de la cible
+    // 4. Descendre LENTEMENT les derniers 15mm pour la précision
 
     // Récupère la pose actuelle
     Pose current;
     GetPose(&current);
 
     // Étape 1 : Monter à safeZ avec la position actuelle (x, y) - vitesse normale
-    qDebug() << "[Robot] Étape 1/3 : Montée à z=" << safeZ << " (sécurité)";
+    qDebug() << "[Robot] Étape 1/4 : Montée à z=" << safeZ << " (sécurité)";
     Pose stepUp = current;
     stepUp.z = safeZ;
     goTo(stepUp, false);  // Vitesse normale
 
     // Étape 2 : Se déplacer horizontalement au-dessus de la cible à safeZ - vitesse normale
-    qDebug() << "[Robot] Étape 2/3 : Déplacement horizontal vers (x=" << target.x << ", y=" << target.y << ", z=" << safeZ << ")";
+    qDebug() << "[Robot] Étape 2/4 : Déplacement horizontal vers (x=" << target.x << ", y=" << target.y << ", z=" << safeZ << ")";
     Pose stepOver = target;
     stepOver.z = safeZ;
     goTo(stepOver, false);  // Vitesse normale
 
-    // Étape 3 : Descendre LENTEMENT à la position cible finale pour éviter l'overshoot
-    qDebug() << "[Robot] Étape 3/3 : Descente PRÉCISE à z=" << target.z;
+    // Étape 3 : Descendre RAPIDEMENT jusqu'à 15mm au-dessus de la cible
+    const float approachDistance = 15.0f;  // Distance finale à parcourir lentement
+    qDebug() << "[Robot] Étape 3/4 : Descente RAPIDE jusqu'à z=" << (target.z + approachDistance);
+    Pose stepApproach = target;
+    stepApproach.z = target.z + approachDistance;
+    goTo(stepApproach, false);  // Vitesse normale
+
+    // Étape 4 : Descendre LENTEMENT les derniers millimètres pour la précision
+    qDebug() << "[Robot] Étape 4/4 : Descente PRÉCISE finale à z=" << target.z;
     goTo(target, true);  // VITESSE RÉDUITE pour la précision
 
     qDebug() << "[Robot] Déplacement sécurisé terminé";

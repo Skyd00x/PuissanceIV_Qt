@@ -319,6 +319,67 @@ void GameScreen::createGameWidget()
     resultLayout->addSpacing(40);
     resultLayout->addWidget(resultQuitButton, 0, Qt::AlignCenter);
 
+    // ============================
+    //   OVERLAY ERREUR DE CONNEXION ROBOT
+    // ============================
+    connectionErrorOverlay = new QWidget(gameWidget);
+    connectionErrorOverlay->setStyleSheet("background-color: rgba(0, 0, 0, 180);");
+    connectionErrorOverlay->hide();
+
+    QVBoxLayout *connectionErrorLayout = new QVBoxLayout(connectionErrorOverlay);
+    connectionErrorLayout->setAlignment(Qt::AlignCenter);
+
+    connectionErrorLabel = new QLabel("ERREUR DE CONNEXION\nImpossible de se connecter au robot");
+    connectionErrorLabel->setAlignment(Qt::AlignCenter);
+    connectionErrorLabel->setStyleSheet(
+        "background-color: rgba(231, 76, 60, 230);"
+        "color: white;"
+        "font-size: 32px;"
+        "font-weight: bold;"
+        "padding: 35px 120px;"
+        "border-radius: 15px;"
+        );
+    connectionErrorLabel->setWordWrap(true);
+    connectionErrorLabel->setMinimumWidth(1000);
+
+    auto *connectionErrorShadow = new QGraphicsDropShadowEffect;
+    connectionErrorShadow->setBlurRadius(40);
+    connectionErrorShadow->setOffset(0, 8);
+    connectionErrorShadow->setColor(QColor(0, 0, 0, 180));
+    connectionErrorLabel->setGraphicsEffect(connectionErrorShadow);
+
+    retryConnectionButton = new QPushButton("Réessayer la connexion");
+    retryConnectionButton->setFixedSize(350, 70);
+    retryConnectionButton->setStyleSheet(
+        "QPushButton { background-color: #2ECC71; color: white; font-size: 24px; font-weight: bold; border-radius: 35px; }"
+        "QPushButton:hover { background-color: #27AE60; }"
+        "QPushButton:pressed { background-color: #1E8449; }"
+        );
+    retryConnectionButton->setCursor(Qt::PointingHandCursor);
+    connect(retryConnectionButton, &QPushButton::clicked, [this]() {
+        connectionErrorOverlay->hide();
+        emit prepareGame();  // Réessayer la connexion
+    });
+
+    quitFromConnectionErrorButton = new QPushButton("Retour au menu");
+    quitFromConnectionErrorButton->setFixedSize(250, 70);
+    quitFromConnectionErrorButton->setStyleSheet(
+        "QPushButton { background-color: #E74C3C; color: white; font-size: 24px; font-weight: bold; border-radius: 35px; }"
+        "QPushButton:hover { background-color: #C0392B; }"
+        "QPushButton:pressed { background-color: #A93226; }"
+        );
+    quitFromConnectionErrorButton->setCursor(Qt::PointingHandCursor);
+    connect(quitFromConnectionErrorButton, &QPushButton::clicked, this, &GameScreen::onQuitButtonClicked);
+
+    QHBoxLayout *connectionErrorButtonLayout = new QHBoxLayout;
+    connectionErrorButtonLayout->addWidget(retryConnectionButton);
+    connectionErrorButtonLayout->addSpacing(30);
+    connectionErrorButtonLayout->addWidget(quitFromConnectionErrorButton);
+
+    connectionErrorLayout->addWidget(connectionErrorLabel);
+    connectionErrorLayout->addSpacing(30);
+    connectionErrorLayout->addLayout(connectionErrorButtonLayout);
+
     // Layout pour le countdown centré
     QVBoxLayout *countdownLayout = new QVBoxLayout;
     countdownLayout->addStretch();
@@ -428,6 +489,8 @@ void GameScreen::createConfirmWidget()
 // ============================================================
 void GameScreen::resetGame()
 {
+    qDebug() << "[GameScreen] === RESET GAME ===";
+
     // Arrêter tous les timers
     chronometer.stop();
     countdownTimer.stop();
@@ -447,14 +510,19 @@ void GameScreen::resetGame()
     cheatOverlay->hide();
     reservoirOverlay->hide();
     resultOverlay->hide();
+    connectionErrorOverlay->hide();
 
     // Réinitialiser les labels
     titleLabel->setText("Partie en mode ");
     turnLabel->setText("");
     cameraLabel->clear();
 
+    // S'assurer que le gameWidget est visible
+    gameWidget->show();
+
     // Retour au widget de jeu
     stack->setCurrentWidget(gameWidget);
+    qDebug() << "[GameScreen] gameWidget is now current widget";
 }
 
 // ============================================================
@@ -462,6 +530,8 @@ void GameScreen::resetGame()
 // ============================================================
 void GameScreen::startGame()
 {
+    qDebug() << "[GameScreen] === START GAME ===";
+
     // Réinitialiser complètement l'écran avant de commencer
     resetGame();
 
@@ -472,10 +542,13 @@ void GameScreen::startGame()
     turnLabel->hide();
     cameraLabel->hide();
 
+    qDebug() << "[GameScreen] Émission du signal prepareGame()";
+
     // Préparer le robot AVANT le countdown (connexion + Home)
     emit prepareGame();
 
     // Le countdown sera lancé automatiquement quand le robot sera prêt
+    qDebug() << "[GameScreen] En attente de robotInitialized() pour démarrer le countdown";
     // via le signal robotInitialized connecté à startCountdownWhenReady()
 }
 
@@ -728,6 +801,20 @@ bool GameScreen::isReservoirOverlayVisible() const
 }
 
 // ============================================================
+//   AFFICHAGE ERREUR DE CONNEXION AU ROBOT
+// ============================================================
+void GameScreen::showConnectionError()
+{
+    // Cacher l'overlay d'initialisation si affiché
+    initializingOverlay->hide();
+
+    // Afficher l'overlay d'erreur de connexion
+    connectionErrorOverlay->setGeometry(gameWidget->rect());
+    connectionErrorOverlay->show();
+    connectionErrorOverlay->raise();
+}
+
+// ============================================================
 //   EVENT DE REDIMENSIONNEMENT
 // ============================================================
 void GameScreen::resizeEvent(QResizeEvent *event)
@@ -748,5 +835,8 @@ void GameScreen::resizeEvent(QResizeEvent *event)
     }
     if (resultOverlay && resultOverlay->isVisible()) {
         resultOverlay->setGeometry(gameWidget->rect());
+    }
+    if (connectionErrorOverlay && connectionErrorOverlay->isVisible()) {
+        connectionErrorOverlay->setGeometry(gameWidget->rect());
     }
 }

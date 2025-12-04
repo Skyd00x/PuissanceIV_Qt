@@ -20,7 +20,7 @@ CalibrationTestScreen::CalibrationTestScreen(Robot *robot, CalibrationLogic* cal
     // === TITRE ===
     titleLabel = new QLabel("Test de calibration", this);
     titleLabel->setAlignment(Qt::AlignCenter);
-    titleLabel->setStyleSheet("font-size: 60px; font-weight: bold; color: #1B3B5F;");
+    titleLabel->setStyleSheet("font-size: 48px; font-weight: bold; color: #1B3B5F;");
 
     // === INSTRUCTIONS ===
     instructionsLabel = new QLabel(
@@ -34,7 +34,7 @@ CalibrationTestScreen::CalibrationTestScreen(Robot *robot, CalibrationLogic* cal
     );
     instructionsLabel->setAlignment(Qt::AlignCenter);
     instructionsLabel->setWordWrap(true);
-    instructionsLabel->setStyleSheet("font-size: 22px; color: #1B3B5F; padding: 20px; line-height: 1.6;");
+    instructionsLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold; padding: 20px;");
     instructionsLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     instructionsLabel->setMinimumWidth(900);
 
@@ -42,9 +42,10 @@ CalibrationTestScreen::CalibrationTestScreen(Robot *robot, CalibrationLogic* cal
     statusLabel = new QLabel("", this);
     statusLabel->setAlignment(Qt::AlignCenter);
     statusLabel->setWordWrap(true);
-    statusLabel->setStyleSheet("font-size: 24px; color: #2ECC71; font-weight: bold; padding: 15px;");
-    statusLabel->setMinimumHeight(80);  // Hauteur minimale pour éviter que le texte soit coupé
-    statusLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+    statusLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold; padding: 25px; line-height: 1.5;");
+    statusLabel->setMinimumHeight(120);  // Hauteur minimale encore augmentée pour éviter que le texte soit coupé
+    statusLabel->setMaximumHeight(150);  // Hauteur maximale pour contrôler l'expansion
+    statusLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     statusLabel->hide();
 
     // === LOADING ===
@@ -173,10 +174,10 @@ void CalibrationTestScreen::onStopTestClicked() {
     qDebug() << "[CalibrationTestScreen] Arrêt demandé par l'utilisateur";
     shouldStop = true;
 
-    // Mettre à jour le statut
+    // Mettre à jour le statut (garder la couleur par défaut)
     QMetaObject::invokeMethod(this, [this]() {
         statusLabel->setText("Arrêt du test en cours...");
-        statusLabel->setStyleSheet("font-size: 24px; color: #E74C3C; font-weight: bold;");
+        statusLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold; padding: 15px;");
     }, Qt::QueuedConnection);
 }
 
@@ -195,12 +196,17 @@ void CalibrationTestScreen::onBackToMenuClicked() {
 void CalibrationTestScreen::runTest() {
     qDebug() << "[CalibrationTestScreen] Thread de test démarré";
 
+    // IMPORTANT: Recharger la calibration depuis le fichier avant le test
+    // (car elle peut avoir été réinitialisée si l'utilisateur a quitté l'écran de calibration)
+    qDebug() << "[CalibrationTestScreen] Rechargement de la calibration depuis le fichier...";
+    calib->loadCalibration("./calibration.json");
+
     // Connexion au robot
     if (!calib->connectToRobot()) {
         qWarning() << "[CalibrationTestScreen] ERREUR: Impossible de se connecter au robot!";
         QMetaObject::invokeMethod(this, [this]() {
             statusLabel->setText("ERREUR: Impossible de se connecter au robot");
-            statusLabel->setStyleSheet("font-size: 24px; color: #E74C3C; font-weight: bold;");
+            statusLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold; padding: 15px;");
             loadingMovie->stop();
             loadingLabel->hide();
             stopButton->hide();
@@ -215,7 +221,7 @@ void CalibrationTestScreen::runTest() {
     // Afficher la progression
     QMetaObject::invokeMethod(this, [this]() {
         statusLabel->setText("Remise en position initiale...");
-        statusLabel->setStyleSheet("font-size: 24px; color: #2ECC71; font-weight: bold;");
+        statusLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold; padding: 15px;");
     }, Qt::QueuedConnection);
 
     // Remise à la position d'origine
@@ -346,10 +352,10 @@ void CalibrationTestScreen::runTest() {
 
         if (shouldStop) {
             statusLabel->setText("Test arrêté par l'utilisateur");
-            statusLabel->setStyleSheet("font-size: 24px; color: #E74C3C; font-weight: bold;");
+            statusLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold; padding: 15px;");
         } else {
-            statusLabel->setText("Test terminé avec succès !");
-            statusLabel->setStyleSheet("font-size: 24px; color: #2ECC71; font-weight: bold;");
+            statusLabel->setText("✅ Test terminé avec succès !");
+            statusLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold; padding: 15px;");
         }
 
         stopButton->hide();

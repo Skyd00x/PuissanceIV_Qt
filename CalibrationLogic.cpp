@@ -157,15 +157,27 @@ void CalibrationLogic::recordStep(int index) {
 
     if (calibPointIndex >= 0 && calibPointIndex < (int)CalibPoint::Count) {
         calibratedPoints[calibPointIndex] = p;
-        qDebug() << "[CalibrationLogic] Position clé" << calibPointIndex << "enregistrée : x=" << p.x << "y=" << p.y << "z=" << p.z << "r=" << p.r;
+
+        // Afficher un message détaillé pour chaque point enregistré
+        QString pointName;
+        if (calibPointIndex >= (int)CalibPoint::Left_1 && calibPointIndex <= (int)CalibPoint::Left_4) {
+            pointName = QString("Left_%1").arg(calibPointIndex - (int)CalibPoint::Left_1 + 1);
+        } else if (calibPointIndex >= (int)CalibPoint::Right_1 && calibPointIndex <= (int)CalibPoint::Right_4) {
+            pointName = QString("Right_%1").arg(calibPointIndex - (int)CalibPoint::Right_1 + 1);
+        } else if (calibPointIndex >= (int)CalibPoint::Grid_1 && calibPointIndex <= (int)CalibPoint::Grid_7) {
+            pointName = QString("Grid_%1").arg(calibPointIndex - (int)CalibPoint::Grid_1 + 1);
+        }
+
+        qDebug() << "[CalibrationLogic] 📍 Point clé" << pointName << "enregistré : x=" << p.x << " y=" << p.y << " z=" << p.z << " r=" << p.r;
     }
 
     emit progressChanged(index);
 
     // Dernière étape (index 7) = calculer les positions intermédiaires puis sauvegarder
     if (index == 7) {
-        qDebug() << "[CalibrationLogic] Calcul des positions intermédiaires...";
+        qDebug() << "[CalibrationLogic] 🔄 Étape finale : calcul des positions intermédiaires...";
         computeIntermediatePositions();
+        qDebug() << "[CalibrationLogic] 💾 Sauvegarde de tous les points...";
         saveCalibration("./calibration.json");
 
         // Mettre la barre de progression à 100%
@@ -232,45 +244,54 @@ std::vector<Pose> CalibrationLogic::interpolatePoints(const Pose& start, const P
 void CalibrationLogic::computeIntermediatePositions() {
     qDebug() << "[CalibrationLogic] Calcul des positions intermédiaires par interpolation";
 
+    // Sauvegarder les points clés manuellement calibrés AVANT interpolation
+    // pour garantir qu'ils ne soient pas modifiés par des erreurs d'arrondi
+    Pose left1_manual  = calibratedPoints[(int)CalibPoint::Left_1];
+    Pose left4_manual  = calibratedPoints[(int)CalibPoint::Left_4];
+    Pose right1_manual = calibratedPoints[(int)CalibPoint::Right_1];
+    Pose right4_manual = calibratedPoints[(int)CalibPoint::Right_4];
+    Pose grid1_manual  = calibratedPoints[(int)CalibPoint::Grid_1];
+    Pose grid4_manual  = calibratedPoints[(int)CalibPoint::Grid_4];
+    Pose grid7_manual  = calibratedPoints[(int)CalibPoint::Grid_7];
+
     // 1️⃣ Réservoir gauche : interpoler Left_2 et Left_3 entre Left_1 et Left_4
-    Pose left1 = calibratedPoints[(int)CalibPoint::Left_1];
-    Pose left4 = calibratedPoints[(int)CalibPoint::Left_4];
-    auto leftReservoir = interpolatePoints(left1, left4, 4);
-    for (int i = 0; i < 4; i++) {
-        calibratedPoints[(int)CalibPoint::Left_1 + i] = leftReservoir[i];
-        qDebug() << "  Left_" << (i+1) << ": x=" << leftReservoir[i].x << " y=" << leftReservoir[i].y << " z=" << leftReservoir[i].z;
-    }
+    auto leftReservoir = interpolatePoints(left1_manual, left4_manual, 4);
+    // Stocker UNIQUEMENT les points intermédiaires (2 et 3), pas les extrémités
+    calibratedPoints[(int)CalibPoint::Left_2] = leftReservoir[1];
+    calibratedPoints[(int)CalibPoint::Left_3] = leftReservoir[2];
+    qDebug() << "  Left_1: x=" << left1_manual.x << " y=" << left1_manual.y << " z=" << left1_manual.z << " (manuel)";
+    qDebug() << "  Left_2: x=" << leftReservoir[1].x << " y=" << leftReservoir[1].y << " z=" << leftReservoir[1].z << " (interpolé)";
+    qDebug() << "  Left_3: x=" << leftReservoir[2].x << " y=" << leftReservoir[2].y << " z=" << leftReservoir[2].z << " (interpolé)";
+    qDebug() << "  Left_4: x=" << left4_manual.x << " y=" << left4_manual.y << " z=" << left4_manual.z << " (manuel)";
 
     // 2️⃣ Réservoir droit : interpoler Right_2 et Right_3 entre Right_1 et Right_4
-    Pose right1 = calibratedPoints[(int)CalibPoint::Right_1];
-    Pose right4 = calibratedPoints[(int)CalibPoint::Right_4];
-    auto rightReservoir = interpolatePoints(right1, right4, 4);
-    for (int i = 0; i < 4; i++) {
-        calibratedPoints[(int)CalibPoint::Right_1 + i] = rightReservoir[i];
-        qDebug() << "  Right_" << (i+1) << ": x=" << rightReservoir[i].x << " y=" << rightReservoir[i].y << " z=" << rightReservoir[i].z;
-    }
+    auto rightReservoir = interpolatePoints(right1_manual, right4_manual, 4);
+    calibratedPoints[(int)CalibPoint::Right_2] = rightReservoir[1];
+    calibratedPoints[(int)CalibPoint::Right_3] = rightReservoir[2];
+    qDebug() << "  Right_1: x=" << right1_manual.x << " y=" << right1_manual.y << " z=" << right1_manual.z << " (manuel)";
+    qDebug() << "  Right_2: x=" << rightReservoir[1].x << " y=" << rightReservoir[1].y << " z=" << rightReservoir[1].z << " (interpolé)";
+    qDebug() << "  Right_3: x=" << rightReservoir[2].x << " y=" << rightReservoir[2].y << " z=" << rightReservoir[2].z << " (interpolé)";
+    qDebug() << "  Right_4: x=" << right4_manual.x << " y=" << right4_manual.y << " z=" << right4_manual.z << " (manuel)";
 
-    // 3️⃣ Grille : interpoler en deux fois (1-4 et 4-7) pour plus de précision
-    Pose grid1 = calibratedPoints[(int)CalibPoint::Grid_1];
-    Pose grid4 = calibratedPoints[(int)CalibPoint::Grid_4];
-    Pose grid7 = calibratedPoints[(int)CalibPoint::Grid_7];
+    // 3️⃣ Grille : interpoler en deux segments (1→4 et 4→7) pour précision maximale
+    // Segment 1 : Grid_1 → Grid_4 (colonnes 1, 2, 3, 4)
+    auto gridLeft = interpolatePoints(grid1_manual, grid4_manual, 4);
+    calibratedPoints[(int)CalibPoint::Grid_2] = gridLeft[1];
+    calibratedPoints[(int)CalibPoint::Grid_3] = gridLeft[2];
+    qDebug() << "  Grid_1: x=" << grid1_manual.x << " y=" << grid1_manual.y << " z=" << grid1_manual.z << " (manuel)";
+    qDebug() << "  Grid_2: x=" << gridLeft[1].x << " y=" << gridLeft[1].y << " z=" << gridLeft[1].z << " (interpolé 1→4)";
+    qDebug() << "  Grid_3: x=" << gridLeft[2].x << " y=" << gridLeft[2].y << " z=" << gridLeft[2].z << " (interpolé 1→4)";
+    qDebug() << "  Grid_4: x=" << grid4_manual.x << " y=" << grid4_manual.y << " z=" << grid4_manual.z << " (manuel)";
 
-    // Interpoler entre Grid_1 et Grid_4 pour obtenir les colonnes 1, 2, 3, 4
-    auto gridLeft = interpolatePoints(grid1, grid4, 4);  // 4 points : 1, 2, 3, 4
-    for (int i = 0; i < 4; i++) {
-        calibratedPoints[(int)CalibPoint::Grid_1 + i] = gridLeft[i];
-        qDebug() << "  Grid_" << (i+1) << ": x=" << gridLeft[i].x << " y=" << gridLeft[i].y << " z=" << gridLeft[i].z;
-    }
+    // Segment 2 : Grid_4 → Grid_7 (colonnes 4, 5, 6, 7)
+    auto gridRight = interpolatePoints(grid4_manual, grid7_manual, 4);
+    calibratedPoints[(int)CalibPoint::Grid_5] = gridRight[1];
+    calibratedPoints[(int)CalibPoint::Grid_6] = gridRight[2];
+    qDebug() << "  Grid_5: x=" << gridRight[1].x << " y=" << gridRight[1].y << " z=" << gridRight[1].z << " (interpolé 4→7)";
+    qDebug() << "  Grid_6: x=" << gridRight[2].x << " y=" << gridRight[2].y << " z=" << gridRight[2].z << " (interpolé 4→7)";
+    qDebug() << "  Grid_7: x=" << grid7_manual.x << " y=" << grid7_manual.y << " z=" << grid7_manual.z << " (manuel)";
 
-    // Interpoler entre Grid_4 et Grid_7 pour obtenir les colonnes 4, 5, 6, 7
-    auto gridRight = interpolatePoints(grid4, grid7, 4);  // 4 points : 4, 5, 6, 7
-    // Ne pas réécrire Grid_4 (déjà fait), commencer à i=1 pour Grid_5
-    for (int i = 1; i < 4; i++) {
-        calibratedPoints[(int)CalibPoint::Grid_4 + i] = gridRight[i];
-        qDebug() << "  Grid_" << (i+4) << ": x=" << gridRight[i].x << " y=" << gridRight[i].y << " z=" << gridRight[i].z;
-    }
-
-    qDebug() << "[CalibrationLogic] Toutes les positions intermédiaires ont été calculées (précision améliorée)";
+    qDebug() << "[CalibrationLogic] ✅ Toutes les positions intermédiaires calculées (7 points manuels + 8 interpolés = 15 points)";
 }
 
 // === Test des positions ===
@@ -445,6 +466,8 @@ void CalibrationLogic::goToGridArea() {
 void CalibrationLogic::saveCalibration(const QString& path) {
     QJsonArray arr;
 
+    qDebug() << "[CalibrationLogic] 💾 Sauvegarde de la calibration dans" << path;
+
     for (int i = 0; i < (int)CalibPoint::Count; i++) {
         const Pose& p = calibratedPoints[i];
         QJsonObject o;
@@ -463,26 +486,34 @@ void CalibrationLogic::saveCalibration(const QString& path) {
     if (f.open(QIODevice::WriteOnly)) {
         f.write(QJsonDocument(root).toJson());
         f.close();
+        qDebug() << "[CalibrationLogic] ✅ Calibration sauvegardée avec succès (" << (int)CalibPoint::Count << "points)";
+    } else {
+        qDebug() << "[CalibrationLogic] ❌ ERREUR : Impossible d'ouvrir le fichier" << path << "pour l'écriture";
     }
 }
 
 // === Chargement ===
 void CalibrationLogic::loadCalibration(const QString& path) {
     QFile f(path);
-    if (!f.open(QIODevice::ReadOnly))
+    if (!f.open(QIODevice::ReadOnly)) {
+        qDebug() << "[CalibrationLogic] ⚠️ Fichier de calibration non trouvé:" << path << "(première utilisation ou calibration non effectuée)";
         return;
+    }
 
     QByteArray data = f.readAll();
     f.close();
 
     QJsonDocument doc = QJsonDocument::fromJson(data);
-    if (!doc.isObject())
+    if (!doc.isObject()) {
+        qWarning() << "[CalibrationLogic] ❌ Fichier de calibration invalide (format JSON incorrect)";
         return;
+    }
 
     QJsonObject root = doc.object();
 
     if (root.contains("points")) {
         QJsonArray arr = root["points"].toArray();
+        int loadedCount = 0;
         for (const auto& v : arr) {
             QJsonObject o = v.toObject();
             int i = o["index"].toInt();
@@ -491,8 +522,12 @@ void CalibrationLogic::loadCalibration(const QString& path) {
                 calibratedPoints[i].y = o["y"].toDouble();
                 calibratedPoints[i].z = o["z"].toDouble();
                 calibratedPoints[i].r = o["r"].toDouble();
+                loadedCount++;
             }
         }
+        qDebug() << "[CalibrationLogic] ✅ Calibration chargée avec succès:" << loadedCount << "points depuis" << path;
+    } else {
+        qWarning() << "[CalibrationLogic] ❌ Fichier de calibration ne contient pas de points";
     }
 }
 
@@ -616,8 +651,8 @@ void CalibrationLogic::pickPiece(CalibPoint reservoirPosition) {
     GetPose(&currentPose);
     currentPose.z += 30.0f;
 
-    qDebug() << "[CalibrationLogic] Extraction du pion : remontée de 30mm à z=" << currentPose.z;
-    robot->goTo(currentPose, true);  // true = mouvement de précision (lent)
+    qDebug() << "[CalibrationLogic] Extraction du pion : remontée lente de 30mm à z=" << currentPose.z;
+    robot->goTo(currentPose, true);  // true = mouvement de précision (lent) pour l'extraction
 }
 
 void CalibrationLogic::dropPiece(int column) {

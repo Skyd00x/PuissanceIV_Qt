@@ -3,6 +3,7 @@
 #include <vector>
 #include <cstdlib>          // Pour rand()
 #include <ctime>            // Pour srand()
+#include <QRandomGenerator> // Pour génération aléatoire améliorée
 using namespace SimpleAI;
 
 // =============================================================
@@ -80,8 +81,9 @@ void GameLogic::prepareGame()
             qDebug() << "[GameLogic] Connexion au robot...";
             if (!calib->connectToRobot()) {
                 qWarning() << "[GameLogic] ERREUR : Impossible de se connecter au robot !";
-                emit endOfGame("❌ ERREUR ❌\nImpossible de se connecter au robot", 0);
+                emit connectionFailed();
                 preparationRunning = false;
+                robotConnected = false;
                 return;
             }
             qDebug() << "[GameLogic] Robot connecté avec succès";
@@ -102,6 +104,11 @@ void GameLogic::prepareGame()
 
             // Vérifier que la pince est bien fermée (état initial avant le début de la partie)
             qDebug() << "[GameLogic] Vérification de l'état de la pince : fermée";
+
+            // Aller au-dessus du réservoir gauche pour être prêt à commencer
+            qDebug() << "[GameLogic] Déplacement au-dessus du réservoir gauche...";
+            calib->goToLeftReservoirArea();
+            qDebug() << "[GameLogic] Positionné au-dessus du réservoir gauche";
 
             qDebug() << "[GameLogic] Robot en position initiale et prêt à jouer";
             emit robotInitialized();
@@ -211,8 +218,14 @@ void GameLogic::stopGame()
         robot->turnOffGripper();  // Couper le compresseur
     }
 
-    // Ne pas déconnecter le robot pour éviter de refaire Home() à chaque partie
-    // La déconnexion se fera à la fermeture de l'application
+    // Déconnecter le robot pour permettre une nouvelle connexion propre à la prochaine partie
+    if (robotConnected && calib) {
+        qDebug() << "[GameLogic] Déconnexion du robot...";
+        calib->disconnectToRobot();
+        robotConnected = false;
+        qDebug() << "[GameLogic] Robot déconnecté";
+    }
+
     qDebug() << "[GameLogic] === PARTIE ARRÊTÉE ===";
 }
 
@@ -424,16 +437,14 @@ void GameLogic::onGridUpdated(const QVector<QVector<int>>& g)
                 QThread* repositionThread = QThread::create([this, isLeftReservoir]() {
                     qDebug() << "[GameLogic] Thread de repositionnement démarré";
 
-                    // Aller au point générique du réservoir (pas à la position exacte du pion)
-                    Pose genericPose = calib->getReservoirGenericPoint(isLeftReservoir);
-                    float safeZ = calib->getSafeHeight();
-
-                    qDebug() << "[GameLogic] Point générique" << (isLeftReservoir ? "GAUCHE" : "DROIT")
-                             << ": x=" << genericPose.x << " y=" << genericPose.y
-                             << " z=" << genericPose.z << " r=" << genericPose.r;
-                    qDebug() << "[GameLogic] Hauteur de sécurité: z=" << safeZ;
-
-                    robot->goToSecurized(genericPose, safeZ);
+                    // Utiliser exactement les mêmes fonctions que les boutons de calibration
+                    if (isLeftReservoir) {
+                        qDebug() << "[GameLogic] Déplacement vers réservoir GAUCHE (mêmes coordonnées que calibration)";
+                        calib->goToLeftReservoirArea();
+                    } else {
+                        qDebug() << "[GameLogic] Déplacement vers réservoir DROIT (mêmes coordonnées que calibration)";
+                        calib->goToRightReservoirArea();
+                    }
 
                     qDebug() << "[GameLogic] Repositionnement terminé";
                 });
@@ -530,14 +541,43 @@ void GameLogic::runNegamax(int depth)
         }
 
         // IA : déterminer la meilleure colonne pour le robot
-        int bestMove;
+        int bestMove = -1;
+
+        // Fonction helper pour vérifier si une colonne est pleine (6 lignes)
+        auto isColumnFull = [this](int col) -> bool {
+            if (col < 0 || col >= 7) return true;  // Colonne invalide = pleine
+            // Une colonne est pleine si toutes les 6 lignes sont remplies (non-zéro)
+            for (int row = 0; row < 6; row++) {
+                if (grid[row][col] == 0) return false;  // Case vide trouvée
+            }
+            return true;  // Toutes les cases sont remplies
+        };
+
+        // Obtenir la liste des colonnes valides (non pleines)
+        QVector<int> validColumns;
+        for (int col = 0; col < 7; col++) {
+            if (!isColumnFull(col)) {
+                validColumns.append(col);
+            }
+        }
+
+        if (validColumns.isEmpty()) {
+            qWarning() << "[GameLogic] ERREUR : Aucune colonne disponible (grille pleine) !";
+            emit endOfGame("Match nul !\nLa grille est pleine", 0);
+            negamaxRunning = false;
+            return;
+        }
 
         if (sm->getDifficulty() == StateMachine::Easy) {
-            // Mode facile : choix complètement aléatoire (pas de Negamax)
-            qDebug() << "[GameLogic] Mode facile : choix aléatoire entre 0 et 6";
+            // Mode facile : choix complètement aléatoire parmi les colonnes valides
+            qDebug() << "[GameLogic] Mode facile : choix aléatoire parmi" << validColumns.size() << "colonnes valides";
+            qDebug() << "[GameLogic] Colonnes disponibles :" << validColumns;
             emit robotStatus("Il réfléchit");
-            bestMove = rand() % 7;  // Colonne aléatoire entre 0 et 6
-            qDebug() << "[GameLogic] Colonne aléatoire choisie :" << bestMove;
+
+            // Utiliser QRandomGenerator pour un vrai aléatoire (meilleur que rand())
+            int randomIndex = QRandomGenerator::global()->bounded(validColumns.size());
+            bestMove = validColumns[randomIndex];
+            qDebug() << "[GameLogic] *** MODE FACILE *** Colonne aléatoire choisie :" << bestMove << "(index" << randomIndex << "sur" << validColumns.size() << "colonnes)";
         } else {
             // Modes Normal, Difficile, Impossible : utiliser Negamax
             qDebug() << "[GameLogic] IA réfléchit avec Negamax...";
@@ -545,6 +585,14 @@ void GameLogic::runNegamax(int depth)
             QVector<QVector<int>> current = grid;
             bestMove = SimpleAI::getBestMove(current, depth, robotColor);
             qDebug() << "[GameLogic] Negamax a choisi la colonne" << bestMove;
+
+            // Vérifier que Negamax n'a pas choisi une colonne pleine (sécurité)
+            if (isColumnFull(bestMove)) {
+                qWarning() << "[GameLogic] ATTENTION : Negamax a choisi une colonne pleine (" << bestMove << "), fallback sur colonne aléatoire";
+                int randomIndex = QRandomGenerator::global()->bounded(validColumns.size());
+                bestMove = validColumns[randomIndex];
+                qDebug() << "[GameLogic] Colonne de fallback :" << bestMove;
+            }
         }
 
         // Vérifier à nouveau après l'IA (opération longue)

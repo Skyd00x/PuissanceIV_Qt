@@ -36,6 +36,7 @@ public slots:
     void resetAllOverlays();           // Cacher tous les overlays
     bool isReservoirOverlayVisible() const;  // Vérifier si l'overlay de réservoirs est visible
     void startCountdownWhenReady();    // Démarrer le countdown quand le robot est prêt
+    void showConnectionError();        // Afficher l'overlay d'erreur de connexion robot
 
 signals:
     void quitRequested();          // L'utilisateur veut quitter la partie
@@ -103,6 +104,12 @@ private:
     QWidget *resultOverlay;
     QLabel *resultLabel;
     QPushButton *resultQuitButton;
+
+    // Overlay pour erreur de connexion au robot
+    QWidget *connectionErrorOverlay;
+    QLabel *connectionErrorLabel;
+    QPushButton *retryConnectionButton;
+    QPushButton *quitFromConnectionErrorButton;
 
     // Timer pour éviter d'afficher l'overlay de grille incomplète trop tôt
     QTimer gridWarningDelayTimer;
