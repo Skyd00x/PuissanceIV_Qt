@@ -51,7 +51,7 @@ signals:
     void connectionFailed();           // Échec de connexion au robot (avec possibilité de réessayer)
 
 private:
-    enum Turn { PlayerTurn, RobotTurn, WaitingForRobotDetection };
+    enum Turn { PlayerTurn, RobotTurn };
     Turn currentTurn = PlayerTurn;
     int lastRobotColumn = -1;  // Dernière colonne jouée par le robot
 
@@ -67,11 +67,12 @@ private:
     int gridConfirmCount = 0;             // compteur de détections identiques (besoin de 5)
     static constexpr int GRID_CONFIRM_THRESHOLD = 5;  // nombre de détections nécessaires
 
-    // Anti-cheat : compteurs pour détecter les triches sur plusieurs images
-    int cheatMultiplePiecesCount = 0;     // Compteur pour plusieurs pions ajoutés
-    int cheatWrongColorCount = 0;         // Compteur pour mauvaise couleur
-    int cheatDuringRobotCount = 0;        // Compteur pour pions ajoutés pendant tour robot
-    static constexpr int CHEAT_CONFIRM_THRESHOLD = 30;  // 30 images consécutives pour confirmer triche
+    // Anti-cheat : validation de stabilité d'un pion sur 15 images
+    QVector<QVector<int>> referenceGrid;  // Grille de référence du dernier tour validé
+    QVector<QVector<int>> stableCandidate; // Grille candidate pour validation de stabilité
+    int stabilityConfirmCount = 0;        // Compteur pour valider qu'un pion est stable (15 images)
+    static constexpr int STABILITY_THRESHOLD = 15;  // 15 images pour confirmer qu'un pion est stable
+    bool waitingForStableGrid = false;    // En attente de validation de stabilité
 
     bool gridReady = false;               // caméra OK
     bool gameRunning = false;

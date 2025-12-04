@@ -384,18 +384,28 @@ std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR)
 void CameraAI::updateGrid(const std::vector<Detection>& dets)
 {
     if ((int)dets.size() != rows_ * cols_) {
-        // Grille incomplète - incrémenter le compteur
-        incompleteCount_++;
+        // Grille incomplète - démarrer le timer si pas déjà démarré
+        if (!incompleteTimerStarted_) {
+            incompleteTimerStarted_ = true;
+            incompleteStartTime_ = std::chrono::steady_clock::now();
+            incompleteCount_++;
+        } else {
+            // Timer déjà démarré, vérifier si 5 secondes se sont écoulées
+            auto now = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - incompleteStartTime_).count();
 
-        // Émettre le signal seulement après 5 détections consécutives
-        if (incompleteCount_ >= 5) {
-            emit gridIncomplete((int)dets.size());
+            if (elapsed >= 5) {
+                // 5 secondes écoulées, émettre le signal
+                emit gridIncomplete((int)dets.size());
+            }
+            incompleteCount_++;
         }
         return;
     }
 
-    // La grille est complète - réinitialiser le compteur et émettre le signal si elle était incomplète avant
-    if (incompleteCount_ > 0) {
+    // La grille est complète - réinitialiser le timer et émettre le signal si elle était incomplète avant
+    if (incompleteTimerStarted_) {
+        incompleteTimerStarted_ = false;
         incompleteCount_ = 0;
         emit gridComplete();
     }

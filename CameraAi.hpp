@@ -5,6 +5,7 @@
 #include <QThread>
 #include <QVector>
 #include <QMutex>
+#include <chrono>
 #include <opencv2/opencv.hpp>
 #undef slots
 #include <torch/script.h>
@@ -64,4 +65,6 @@ private:
     Grid               grid_;          // ← Grille utilisant le type Grid
     bool               gridComplete_ = false;
     int                incompleteCount_ = 0;  // Compteur de détections incomplètes consécutives
+    bool               incompleteTimerStarted_ = false;  // Timer démarré pour grille incomplète
+    std::chrono::steady_clock::time_point incompleteStartTime_;  // Début de la période incomplète
 };

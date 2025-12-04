@@ -99,6 +99,23 @@ void Robot::setPrecisionSpeed()
 void Robot::Home()
 {
     qDebug() << "[Robot] ==== DÉBUT Home() ====";
+
+    // ÉTAPE 1 : Monter en Z+150 pour éviter les collisions
+    qDebug() << "[Robot] Récupération de la position actuelle...";
+    Pose current;
+    GetPose(&current);
+    qDebug() << "[Robot] Position actuelle : X=" << current.x << " Y=" << current.y << " Z=" << current.z << " R=" << current.r;
+
+    // Créer une nouvelle position avec Z+150
+    Pose safePos = current;
+    safePos.z += 150.0f;
+    qDebug() << "[Robot] Montée à Z+150 : Z=" << safePos.z;
+
+    // Monter à la position de sécurité
+    goTo(safePos);
+    qDebug() << "[Robot] Position de sécurité atteinte";
+
+    // ÉTAPE 2 : Retour à la position Home
     HOMECmd homeCmd = {0};
     uint64_t idx = 0;
 

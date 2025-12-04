@@ -26,10 +26,14 @@ GameLogic::GameLogic(CameraAI* cam,
     grid.resize(6);
     prevGrid.resize(6);
     candidateGrid.resize(6);
+    referenceGrid.resize(6);
+    stableCandidate.resize(6);
     for (int r = 0; r < 6; r++) {
         grid[r].resize(7);
         prevGrid[r].resize(7);
         candidateGrid[r].resize(7);
+        referenceGrid[r].resize(7);
+        stableCandidate[r].resize(7);
     }
 
     // Frame vers view
@@ -172,7 +176,11 @@ void GameLogic::stopGame()
 
     // Réinitialiser tous les compteurs et états
     gridConfirmCount = 0;
+    stabilityConfirmCount = 0;
+    waitingForStableGrid = false;
     candidateGrid.clear();
+    referenceGrid.clear();
+    stableCandidate.clear();
     currentTurn = PlayerTurn;
     lastRobotColumn = -1;
 
@@ -246,214 +254,193 @@ void GameLogic::onGridUpdated(const QVector<QVector<int>>& g)
     if (!gameRunning)
         return;
 
-    // Système de confirmation : attendre 5 grilles identiques avant de valider
-    if (candidateGrid.isEmpty() || !areGridsEqual(candidateGrid, g)) {
-        // Nouvelle grille détectée, réinitialiser le compteur
-        candidateGrid = g;
-        gridConfirmCount = 1;
+    // ===== PHASE 1 : DÉTECTION INITIALE (5 images identiques) =====
+    if (!waitingForStableGrid) {
+        if (candidateGrid.isEmpty() || !areGridsEqual(candidateGrid, g)) {
+            // Nouvelle grille détectée, réinitialiser le compteur
+            candidateGrid = g;
+            gridConfirmCount = 1;
+            return;
+        }
+
+        // La grille est identique à la précédente
+        gridConfirmCount++;
+
+        // Attendre GRID_CONFIRM_THRESHOLD détections identiques avant de passer à la validation de stabilité
+        if (gridConfirmCount < GRID_CONFIRM_THRESHOLD)
+            return;
+
+        // Grille détectée sur 5 images, vérifier qu'elle est différente de la grille de référence
+        // Si c'est la même grille, ignorer (aucun coup n'a été joué)
+        if (gridReady && !referenceGrid.isEmpty() && areGridsEqual(g, referenceGrid)) {
+            // La grille n'a pas changé depuis le dernier coup validé, ignorer
+            gridConfirmCount = 0;  // Réinitialiser pour éviter de reboucler
+            return;
+        }
+
+        // Grille détectée sur 5 images ET différente de la référence, passer à la phase de validation de stabilité
+        qDebug() << "[GameLogic] Grille détectée sur 5 images (différente de la référence), validation de stabilité...";
+        stableCandidate = g;
+        stabilityConfirmCount = 1;
+        waitingForStableGrid = true;
+        gridConfirmCount = 0;
         return;
     }
 
-    // La grille est identique à la précédente
-    gridConfirmCount++;
-
-    // Attendre GRID_CONFIRM_THRESHOLD détections identiques avant de valider
-    if (gridConfirmCount < GRID_CONFIRM_THRESHOLD)
-        return;
-
-    // Grille confirmée après 5 détections identiques
-
-    // =====================================================
-    // IMPORTANT : ANTI-TRICHE AVANT VÉRIFICATION VICTOIRE
-    // =====================================================
-    // L'anti-triche DOIT être vérifié AVANT la victoire pour empêcher
-    // un joueur de poser 4 pions alignés d'un coup et de gagner malgré la triche.
-    // Si une triche est détectée, on retourne immédiatement sans vérifier la victoire.
-
-    // Vérification anti-triche : vérifier que la composition de la grille est valide
-    int newPiecesCount = 0;
-    int newPlayerPieces = 0;
-    int newRobotPieces = 0;
-
-    for (int r = 0; r < 6; r++) {
-        for (int c = 0; c < 7; c++) {
-            // Un pion a disparu (case remplie -> case vide)
-            if (grid[r][c] != 0 && g[r][c] == 0) {
-                camera->stop();
-                emit cheatDetected("TRICHE DÉTECTÉE\nUn pion a été retiré de la grille !");
-                gameRunning = false;
-                return;
-            }
-            // Un pion a changé de couleur
-            else if (grid[r][c] != 0 && g[r][c] != 0 && grid[r][c] != g[r][c]) {
-                camera->stop();
-                emit cheatDetected("TRICHE DÉTECTÉE\nUn pion a changé de couleur !");
-                gameRunning = false;
-                return;
-            }
-            // Un nouveau pion est apparu (case vide -> case remplie)
-            else if (grid[r][c] == 0 && g[r][c] != 0) {
-                newPiecesCount++;
-                if (g[r][c] == playerColor)
-                    newPlayerPieces++;
-                else if (g[r][c] == robotColor)
-                    newRobotPieces++;
-            }
-        }
-    }
-
-    // Détection de triche au tour du joueur (avec compteur pour éviter faux positifs)
-    if (currentTurn == PlayerTurn) {
-        if (newPiecesCount > 1) {
-            cheatMultiplePiecesCount++;
-            if (cheatMultiplePiecesCount >= CHEAT_CONFIRM_THRESHOLD) {
-                camera->stop();
-                emit cheatDetected("TRICHE DÉTECTÉE\nPlusieurs pions ont été ajoutés en même temps !");
-                gameRunning = false;
-                return;
-            }
-        } else {
-            cheatMultiplePiecesCount = 0;  // Réinitialiser si plus de triche
+    // ===== PHASE 2 : VALIDATION DE STABILITÉ (15 images) =====
+    if (waitingForStableGrid) {
+        if (!areGridsEqual(stableCandidate, g)) {
+            // La grille a changé, retour à la phase de détection
+            qDebug() << "[GameLogic] Grille instable, retour à la phase de détection";
+            candidateGrid = g;
+            gridConfirmCount = 1;
+            stabilityConfirmCount = 0;
+            waitingForStableGrid = false;
+            return;
         }
 
-        if (newRobotPieces > 0) {
-            cheatWrongColorCount++;
-            if (cheatWrongColorCount >= CHEAT_CONFIRM_THRESHOLD) {
-                camera->stop();
-                emit cheatDetected("TRICHE DÉTECTÉE\nMauvaise couleur de pion !\nVous devez jouer avec les pions " +
-                                 QString(playerColor == 1 ? "rouges" : "jaunes"));
-                gameRunning = false;
-                return;
-            }
-        } else {
-            cheatWrongColorCount = 0;  // Réinitialiser si plus de triche
-        }
-    }
+        stabilityConfirmCount++;
 
-    // Détection de triche pendant l'attente de détection du robot (avec compteur)
-    if (currentTurn == WaitingForRobotDetection) {
-        if (newPiecesCount > 1 || newPlayerPieces > 0) {
-            cheatDuringRobotCount++;
-            if (cheatDuringRobotCount >= CHEAT_CONFIRM_THRESHOLD) {
-                camera->stop();
-                if (newPiecesCount > 1) {
-                    emit cheatDetected("TRICHE DÉTECTÉE\nPions ajoutés pendant le tour du robot !");
-                } else {
-                    emit cheatDetected("TRICHE DÉTECTÉE\nPion du joueur ajouté pendant le tour du robot !");
+        // Attendre STABILITY_THRESHOLD images identiques pour valider la stabilité
+        if (stabilityConfirmCount < STABILITY_THRESHOLD)
+            return;
+
+        // Pion stable validé sur 15 images !
+        qDebug() << "[GameLogic] Pion stable validé sur 15 images";
+        waitingForStableGrid = false;
+        stabilityConfirmCount = 0;
+
+        // ===== PHASE 3 : ANTI-CHEAT (comparaison avec grille de référence) =====
+        // Si c'est la première grille (début de partie), initialiser la référence
+        if (referenceGrid.isEmpty() || !gridReady) {
+            qDebug() << "[GameLogic] Initialisation de la grille de référence";
+            referenceGrid = g;
+            grid = g;
+            gridReady = true;
+            return;
+        }
+
+        // Comparer avec la grille de référence du tour précédent
+        int newPiecesCount = 0;
+        int newPlayerPieces = 0;
+        int newRobotPieces = 0;
+
+        for (int r = 0; r < 6; r++) {
+            for (int c = 0; c < 7; c++) {
+                // Un pion a disparu (case remplie -> case vide)
+                if (referenceGrid[r][c] != 0 && g[r][c] == 0) {
+                    camera->stop();
+                    emit cheatDetected("TRICHE DÉTECTÉE\nUn pion a été retiré de la grille !");
+                    gameRunning = false;
+                    return;
                 }
-                gameRunning = false;
-                return;
+                // Un pion a changé de couleur
+                else if (referenceGrid[r][c] != 0 && g[r][c] != 0 && referenceGrid[r][c] != g[r][c]) {
+                    camera->stop();
+                    emit cheatDetected("TRICHE DÉTECTÉE\nUn pion a changé de couleur !");
+                    gameRunning = false;
+                    return;
+                }
+                // Un nouveau pion est apparu (case vide -> case remplie)
+                else if (referenceGrid[r][c] == 0 && g[r][c] != 0) {
+                    newPiecesCount++;
+                    if (g[r][c] == playerColor)
+                        newPlayerPieces++;
+                    else if (g[r][c] == robotColor)
+                        newRobotPieces++;
+                }
             }
-        } else {
-            cheatDuringRobotCount = 0;  // Réinitialiser si plus de triche
         }
-    }
 
-    prevGrid = grid;
-    grid = g;
-    gridReady = true;
-    gridConfirmCount = 0;  // Réinitialiser pour la prochaine détection
-
-    // Vérifier la victoire et l'égalité avant de continuer
-    if (checkWin(playerColor)) {
-        camera->stop();
-        QString diffString;
-        switch (sm->getDifficulty()) {
-        case StateMachine::Easy: diffString = "Facile"; break;
-        case StateMachine::Medium: diffString = "Normal"; break;
-        case StateMachine::Hard: diffString = "Difficile"; break;
-        case StateMachine::Impossible: diffString = "Impossible"; break;
-        }
-        emit gameResult("Joueur", diffString, elapsedSeconds);
-        gameRunning = false;
-        return;
-    }
-
-    if (checkWin(robotColor)) {
-        camera->stop();
-        QString diffString;
-        switch (sm->getDifficulty()) {
-        case StateMachine::Easy: diffString = "Facile"; break;
-        case StateMachine::Medium: diffString = "Normal"; break;
-        case StateMachine::Hard: diffString = "Difficile"; break;
-        case StateMachine::Impossible: diffString = "Impossible"; break;
-        }
-        emit gameResult("Robot", diffString, elapsedSeconds);
-        gameRunning = false;
-        return;
-    }
-
-    if (isBoardFull()) {
-        camera->stop();
-        QString diffString;
-        switch (sm->getDifficulty()) {
-        case StateMachine::Easy: diffString = "Facile"; break;
-        case StateMachine::Medium: diffString = "Normal"; break;
-        case StateMachine::Hard: diffString = "Difficile"; break;
-        case StateMachine::Impossible: diffString = "Impossible"; break;
-        }
-        emit gameResult("Égalité", diffString, elapsedSeconds);
-        gameRunning = false;
-        return;
-    }
-
-    if (currentTurn == PlayerTurn)
-    {
-        int playedCol = -1;
-        if (detectPlayerMove(prevGrid, grid, playedCol))
-        {
-            qDebug() << "[GameLogic] Détection coup joueur dans colonne" << playedCol;
-            currentTurn = RobotTurn;
-            emit turnRobot();
-            qDebug() << "[GameLogic] Passage au tour du robot";
-            launchRobotTurn();
-        }
-    }
-    else if (currentTurn == WaitingForRobotDetection)
-    {
-        qDebug() << "[GameLogic] En attente de détection du pion du robot dans colonne" << lastRobotColumn;
-        // Attendre que le pion du robot soit détecté
-        if (detectRobotPlacement(prevGrid, grid, lastRobotColumn))
-        {
-            qDebug() << "[GameLogic] Pion du robot détecté !";
-
-            // Maintenant qu'on a détecté le pion, lancer un thread pour aller au point générique du prochain réservoir
-            bool hasNextPiece = false;
-            bool isLeftReservoir = false;
-
-            if (leftReservoirPieces > 0) {
-                isLeftReservoir = true;
-                hasNextPiece = true;
-            } else if (rightReservoirPieces > 0) {
-                isLeftReservoir = false;
-                hasNextPiece = true;
+        // Vérifier qu'exactement un pion a été ajouté
+        if (newPiecesCount != 1) {
+            camera->stop();
+            if (newPiecesCount == 0) {
+                emit cheatDetected("ERREUR\nAucun pion détecté alors qu'un coup devrait avoir été joué !");
+            } else {
+                emit cheatDetected("TRICHE DÉTECTÉE\nPlusieurs pions ont été ajoutés en même temps !");
             }
+            gameRunning = false;
+            return;
+        }
 
-            if (hasNextPiece) {
-                qDebug() << "[GameLogic] Lancement du repositionnement au réservoir" << (isLeftReservoir ? "gauche" : "droit");
-                emit robotStatus(QString("Se repositionne au réservoir %1").arg(isLeftReservoir ? "gauche" : "droit"));
+        // Vérifier que c'est la bonne couleur selon le tour actuel
+        if (currentTurn == PlayerTurn && newPlayerPieces != 1) {
+            camera->stop();
+            emit cheatDetected("TRICHE DÉTECTÉE\nMauvaise couleur de pion !\nVous devez jouer avec les pions " +
+                             QString(playerColor == 1 ? "rouges" : "jaunes"));
+            gameRunning = false;
+            return;
+        }
 
-                // Lancer le repositionnement dans un thread pour ne pas bloquer l'UI
-                QThread* repositionThread = QThread::create([this, isLeftReservoir]() {
-                    qDebug() << "[GameLogic] Thread de repositionnement démarré";
+        if (currentTurn == RobotTurn && newRobotPieces != 1) {
+            camera->stop();
+            emit cheatDetected("ERREUR SYSTÈME\nLe robot devrait avoir joué un pion " +
+                             QString(robotColor == 1 ? "rouge" : "jaune"));
+            gameRunning = false;
+            return;
+        }
 
-                    // Utiliser exactement les mêmes fonctions que les boutons de calibration
-                    if (isLeftReservoir) {
-                        qDebug() << "[GameLogic] Déplacement vers réservoir GAUCHE (mêmes coordonnées que calibration)";
-                        calib->goToLeftReservoirArea();
-                    } else {
-                        qDebug() << "[GameLogic] Déplacement vers réservoir DROIT (mêmes coordonnées que calibration)";
-                        calib->goToRightReservoirArea();
-                    }
+        // ===== PHASE 4 : ENREGISTREMENT ET CONTINUATION =====
+        qDebug() << "[GameLogic] Anti-cheat OK, enregistrement de la nouvelle grille de référence";
+        prevGrid = referenceGrid;
+        referenceGrid = g;
+        grid = g;
 
-                    qDebug() << "[GameLogic] Repositionnement terminé";
-                });
-
-                connect(repositionThread, &QThread::finished, repositionThread, &QThread::deleteLater);
-                repositionThread->start();
+        // Vérifier la victoire et l'égalité
+        if (checkWin(playerColor)) {
+            camera->stop();
+            QString diffString;
+            switch (sm->getDifficulty()) {
+            case StateMachine::Easy: diffString = "Facile"; break;
+            case StateMachine::Medium: diffString = "Normal"; break;
+            case StateMachine::Hard: diffString = "Difficile"; break;
+            case StateMachine::Impossible: diffString = "Impossible"; break;
             }
+            emit gameResult("Joueur", diffString, elapsedSeconds);
+            gameRunning = false;
+            return;
+        }
 
-            qDebug() << "[GameLogic] Passage au tour du joueur";
+        if (checkWin(robotColor)) {
+            camera->stop();
+            QString diffString;
+            switch (sm->getDifficulty()) {
+            case StateMachine::Easy: diffString = "Facile"; break;
+            case StateMachine::Medium: diffString = "Normal"; break;
+            case StateMachine::Hard: diffString = "Difficile"; break;
+            case StateMachine::Impossible: diffString = "Impossible"; break;
+            }
+            emit gameResult("Robot", diffString, elapsedSeconds);
+            gameRunning = false;
+            return;
+        }
+
+        if (isBoardFull()) {
+            camera->stop();
+            QString diffString;
+            switch (sm->getDifficulty()) {
+            case StateMachine::Easy: diffString = "Facile"; break;
+            case StateMachine::Medium: diffString = "Normal"; break;
+            case StateMachine::Hard: diffString = "Difficile"; break;
+            case StateMachine::Impossible: diffString = "Impossible"; break;
+            }
+            emit gameResult("Égalité", diffString, elapsedSeconds);
+            gameRunning = false;
+            return;
+        }
+
+        // Passage au tour suivant
+        if (currentTurn == PlayerTurn) {
+            int playedCol = -1;
+            if (detectPlayerMove(prevGrid, grid, playedCol)) {
+                qDebug() << "[GameLogic] Coup joueur validé dans colonne" << playedCol;
+                currentTurn = RobotTurn;
+                emit turnRobot();
+                launchRobotTurn();
+            }
+        } else if (currentTurn == RobotTurn) {
+            qDebug() << "[GameLogic] Coup robot validé, passage au tour du joueur";
             currentTurn = PlayerTurn;
             emit turnPlayer();
         }
@@ -633,7 +620,7 @@ void GameLogic::runNegamax(int depth)
         }
 
         qDebug() << "[GameLogic] Place le pion dans la colonne" << bestMove;
-        emit robotStatus(QString("Place le pion dans la colonne %1").arg(bestMove));
+        emit robotStatus(QString("Place le pion dans la colonne %1").arg(bestMove+1));
         // Lâcher le pion dans la colonne choisie (fonction de haut niveau)
         calib->dropPiece(bestMove);
         qDebug() << "[GameLogic] Pion placé";
@@ -645,18 +632,54 @@ void GameLogic::runNegamax(int depth)
             return;
         }
 
-        // NE PAS aller au-dessus du prochain pion maintenant
-        // On attend d'abord que le pion soit détecté par la caméra
-        // Le mouvement se fera dans onGridUpdated() après détection
-
-        // Fin du tour robot - attendre maintenant la détection du pion par la caméra
-        qDebug() << "[GameLogic] Robot a fini, attente de détection du pion dans la colonne" << bestMove;
-        emit robotStatus(QString("Attend détection du pion dans la colonne %1").arg(bestMove));
+        // Fin du tour robot - marquer negamaxRunning à false AVANT le repositionnement
+        // pour permettre au joueur de jouer rapidement
+        qDebug() << "[GameLogic] Robot a terminé son action";
         negamaxRunning = false;
         lastRobotColumn = bestMove;
-        currentTurn = WaitingForRobotDetection;
-        // Note : on ne repasse PAS au tour du joueur ici
-        // On attend que onGridUpdated détecte le pion du robot
+
+        // Repositionner le robot au-dessus du prochain réservoir (asynchrone)
+        // TOUJOURS repositionner, même si les réservoirs sont vides, pour éviter l'ombre sur la grille
+        // Si le joueur joue pendant ce repositionnement, le robot pourra jouer immédiatement
+        // car les commandes Dobot sont en queue et gérées dans l'ordre
+        bool reservoirsEmpty = (leftReservoirPieces <= 0 && rightReservoirPieces <= 0);
+        bool isLeftReservoir = true;  // Par défaut, aller au réservoir gauche
+
+        if (leftReservoirPieces > 0) {
+            isLeftReservoir = true;
+        } else if (rightReservoirPieces > 0) {
+            isLeftReservoir = false;
+        }
+        // Sinon, on garde isLeftReservoir = true (réservoir gauche par défaut si vides)
+
+        qDebug() << "[GameLogic] Lancement du repositionnement au réservoir" << (isLeftReservoir ? "gauche" : "droit");
+        emit robotStatus(QString("Se repositionne au réservoir %1").arg(isLeftReservoir ? "gauche" : "droit"));
+
+        // Lancer le repositionnement dans un thread séparé (asynchrone)
+        QThread* repositionThread = QThread::create([this, isLeftReservoir, reservoirsEmpty]() {
+            qDebug() << "[GameLogic] Thread de repositionnement démarré";
+
+            if (isLeftReservoir) {
+                qDebug() << "[GameLogic] Déplacement vers réservoir GAUCHE";
+                calib->goToLeftReservoirArea();
+            } else {
+                qDebug() << "[GameLogic] Déplacement vers réservoir DROIT";
+                calib->goToRightReservoirArea();
+            }
+
+            qDebug() << "[GameLogic] Repositionnement terminé";
+
+            // Si les réservoirs sont vides, émettre le signal APRÈS le repositionnement
+            if (reservoirsEmpty) {
+                qDebug() << "[GameLogic] Réservoirs vides ! Demande de remplissage...";
+                emit reservoirEmpty();
+            }
+        });
+
+        connect(repositionThread, &QThread::finished, repositionThread, &QThread::deleteLater);
+        repositionThread->start();
+
+        // currentTurn reste à RobotTurn - onGridUpdated() va le changer à PlayerTurn après validation
     });
 
     negamaxThreadObj->start();
