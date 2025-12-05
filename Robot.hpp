@@ -28,6 +28,7 @@ public:
     void disconnect();    // Déconnecte proprement et vide la file de commandes
     static bool isAvailable();   // Vérifie si un Dobot est détectable
     void clearAlarms();   // Clear toutes les alarmes du robot
+    void emergencyStop(); // Arrêt d'urgence immédiat du robot
 
     // === Mouvements ===
     void Home();                           // Retourne le robot en position Home

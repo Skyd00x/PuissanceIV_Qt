@@ -26,7 +26,7 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     progressBar->setValue(0);
     progressBar->setFixedSize(900, 25);
     progressBar->setTextVisible(true);
-    progressBar->setFormat("%p%");
+    progressBar->setFormat("Étape %v / %m");
     progressBar->setStyleSheet(
         "QProgressBar { background-color: #E0E0E0; border-radius: 12px; color: #1B3B5F; "
         "font-size: 18px; font-weight: bold; text-align: center; }"

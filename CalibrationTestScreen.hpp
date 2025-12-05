@@ -51,4 +51,5 @@ private:
     QPushButton* startButton;
     QPushButton* stopButton;
     QPushButton* backButton;
+    QPushButton* emergencyStopButton;
 };

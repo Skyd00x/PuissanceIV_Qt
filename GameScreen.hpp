@@ -39,12 +39,14 @@ public slots:
     bool isReservoirOverlayVisible() const;  // Vérifier si l'overlay de réservoirs est visible
     void startCountdownWhenReady();    // Démarrer le countdown quand le robot est prêt
     void showConnectionError();        // Afficher l'overlay d'erreur de connexion robot
+    void showEmergencyStopOverlay();   // Afficher l'overlay d'arrêt d'urgence
 
 signals:
     void quitRequested();          // L'utilisateur veut quitter la partie
     void prepareGame();            // Avant le countdown → préparer le robot
     void countdownFinished();      // Fin du compte à rebours → GameLogic démarre
     void reservoirsRefilled();     // L'utilisateur a rempli les réservoirs
+    void emergencyStopRequested(); // Arrêt d'urgence du robot demandé
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
@@ -72,6 +74,7 @@ private:
 
     // Éléments du jeu
     QPushButton *quitButton;
+    QPushButton *emergencyStopButton;  // Bouton d'arrêt d'urgence du robot
 
     QLabel *titleLabel;          // Partie en mode X
     QLabel *turnLabel;           // Au tour du joueur/robot
@@ -115,6 +118,11 @@ private:
     QLabel *connectionErrorLabel;
     QPushButton *retryConnectionButton;
     QPushButton *quitFromConnectionErrorButton;
+
+    // Overlay pour arrêt d'urgence
+    QWidget *emergencyStopOverlay;
+    QLabel *emergencyStopLabel;
+    QPushButton *emergencyStopQuitButton;
 
     // Timer pour éviter d'afficher l'overlay de grille incomplète trop tôt
     QTimer gridWarningDelayTimer;

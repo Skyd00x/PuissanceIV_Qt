@@ -45,8 +45,8 @@ CalibrationTestScreen::CalibrationTestScreen(Robot *robot, CalibrationLogic* cal
     statusLabel->setAlignment(Qt::AlignCenter);
     statusLabel->setWordWrap(true);
     statusLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold; padding: 25px; line-height: 1.5;");
-    statusLabel->setMinimumHeight(120);  // Hauteur minimale encore augmentée pour éviter que le texte soit coupé
-    statusLabel->setMaximumHeight(150);  // Hauteur maximale pour contrôler l'expansion
+    statusLabel->setMinimumHeight(200);  // Hauteur minimale augmentée pour afficher les messages d'urgence
+    statusLabel->setMaximumHeight(250);  // Hauteur maximale pour contrôler l'expansion
     statusLabel->setMinimumWidth(700);  // Largeur minimale pour afficher les messages longs
     statusLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     statusLabel->hide();
@@ -78,8 +78,10 @@ CalibrationTestScreen::CalibrationTestScreen(Robot *robot, CalibrationLogic* cal
     startButton = new QPushButton("Lancer le test");
     stopButton = new QPushButton("Arrêter le test");
     backButton = new QPushButton("Retour");
+    emergencyStopButton = new QPushButton("ARRÊT D'URGENCE");
 
     stopButton->hide();
+    emergencyStopButton->hide();
 
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     buttonLayout->setAlignment(Qt::AlignCenter);
@@ -109,19 +111,58 @@ CalibrationTestScreen::CalibrationTestScreen(Robot *robot, CalibrationLogic* cal
     mainLayout->addWidget(progressBar, 0, Qt::AlignCenter);
     mainLayout->addSpacing(40);
     mainLayout->addLayout(buttonLayout);
+    mainLayout->addSpacing(15);
+    mainLayout->addWidget(emergencyStopButton, 0, Qt::AlignCenter);
     mainLayout->addStretch();
 
     // === STYLE DES BOUTONS ===
     styleButton(startButton, "#2ECC71", "#27AE60");
     styleButton(stopButton, "#E74C3C", "#C0392B");
+    styleButton(emergencyStopButton, "#FF0000", "#CC0000");  // Rouge vif pour arrêt d'urgence
 
     startButton->setFixedHeight(70);
     stopButton->setFixedHeight(70);
+    emergencyStopButton->setFixedHeight(60);
+    emergencyStopButton->setMinimumWidth(320);
 
     // === CONNEXIONS ===
     connect(startButton, &QPushButton::clicked, this, &CalibrationTestScreen::onStartTestClicked);
     connect(stopButton, &QPushButton::clicked, this, &CalibrationTestScreen::onStopTestClicked);
     connect(backButton, &QPushButton::clicked, this, &CalibrationTestScreen::onBackToMenuClicked);
+    connect(emergencyStopButton, &QPushButton::clicked, this, [this]() {
+        qDebug() << "[CalibrationTestScreen] ARRÊT D'URGENCE activé !";
+
+        // Arrêt immédiat du robot
+        this->robot->emergencyStop();
+        this->shouldStop = true;
+
+        // Arrêter le test et mettre à jour l'interface
+        QMetaObject::invokeMethod(this, [this]() {
+            // Arrêter les animations et la progression
+            loadingMovie->stop();
+            loadingLabel->hide();
+            progressBar->hide();
+
+            // Cacher tous les boutons sauf le bouton retour
+            startButton->hide();
+            stopButton->hide();
+            emergencyStopButton->hide();
+
+            // Afficher un message d'urgence
+            statusLabel->setText("ARRÊT D'URGENCE ACTIVÉ️<br><br>"
+                                "Le robot a été arrêté immédiatement.<br>");
+            statusLabel->setStyleSheet("font-size: 24px; color: #FF0000; font-weight: bold; padding: 15px;");
+            statusLabel->show();
+
+            // Cacher les instructions
+            instructionsLabel->hide();
+
+            // Afficher le bouton retour
+            backButton->show();
+
+            testRunning = false;
+        }, Qt::QueuedConnection);
+    });
 
     setLayout(mainLayout);
 }
@@ -140,6 +181,7 @@ void CalibrationTestScreen::resetScreen() {
 
     startButton->show();
     stopButton->hide();
+    emergencyStopButton->hide();
     backButton->show();
 }
 
@@ -158,9 +200,10 @@ void CalibrationTestScreen::onStartTestClicked() {
     loadingLabel->show();
     loadingMovie->start();
 
-    // Masquer le bouton start, afficher le bouton stop
+    // Masquer le bouton start, afficher le bouton stop et arrêt d'urgence
     startButton->hide();
     stopButton->show();
+    emergencyStopButton->show();
 
     // Masquer le bouton retour pendant le test
     backButton->hide();
@@ -214,6 +257,7 @@ void CalibrationTestScreen::runTest() {
             loadingMovie->stop();
             loadingLabel->hide();
             stopButton->hide();
+            emergencyStopButton->hide();
             startButton->show();
             backButton->show();
         }, Qt::QueuedConnection);
@@ -222,10 +266,12 @@ void CalibrationTestScreen::runTest() {
     }
     qDebug() << "[CalibrationTestScreen] Robot connecté avec succès";
 
-    // Afficher la progression
+    // Afficher la progression (sauf si arrêt d'urgence)
     QMetaObject::invokeMethod(this, [this]() {
-        statusLabel->setText("Remise en position initiale...");
-        statusLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold; padding: 15px;");
+        if (!shouldStop) {
+            statusLabel->setText("Remise en position initiale...");
+            statusLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold; padding: 15px;");
+        }
     }, Qt::QueuedConnection);
 
     // Remise à la position d'origine
@@ -240,11 +286,13 @@ void CalibrationTestScreen::runTest() {
         return;
     }
 
-    // Afficher la barre de progression
+    // Afficher la barre de progression (sauf si arrêt d'urgence)
     QMetaObject::invokeMethod(this, [this]() {
-        progressBar->show();
-        loadingMovie->stop();
-        loadingLabel->hide();
+        if (!shouldStop) {
+            progressBar->show();
+            loadingMovie->stop();
+            loadingLabel->hide();
+        }
     }, Qt::QueuedConnection);
 
     // Test des mouvements : épuise réservoir gauche (4 pions) puis réservoir droit (4 pions)
@@ -257,9 +305,11 @@ void CalibrationTestScreen::runTest() {
 
         qDebug() << QString("[CalibrationTestScreen] === Test %1/8 ===").arg(i+1);
 
-        // Mettre à jour le statut
+        // Mettre à jour le statut (sauf si arrêt d'urgence)
         QMetaObject::invokeMethod(this, [this, i]() {
-            statusLabel->setText(QString("Test %1/8 : Récupération du pion...").arg(i+1));
+            if (!shouldStop) {
+                statusLabel->setText(QString("Test %1/8 : Récupération du pion...").arg(i+1));
+            }
         }, Qt::QueuedConnection);
 
         // Déterminer la position de réservoir
@@ -293,9 +343,11 @@ void CalibrationTestScreen::runTest() {
             break;
         }
 
-        // Mettre à jour le statut
+        // Mettre à jour le statut (sauf si arrêt d'urgence)
         QMetaObject::invokeMethod(this, [this, i]() {
-            statusLabel->setText(QString("Test %1/8 : Dépôt du pion...").arg(i+1));
+            if (!shouldStop) {
+                statusLabel->setText(QString("Test %1/8 : Dépôt du pion...").arg(i+1));
+            }
         }, Qt::QueuedConnection);
 
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -324,9 +376,11 @@ void CalibrationTestScreen::runTest() {
 
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-        // Mettre à jour la progression
+        // Mettre à jour la progression (sauf si arrêt d'urgence)
         QMetaObject::invokeMethod(this, [this, i]() {
-            progressBar->setValue(i + 1);
+            if (!shouldStop) {
+                progressBar->setValue(i + 1);
+            }
         }, Qt::QueuedConnection);
 
         qDebug() << QString("[CalibrationTestScreen] Test %1/8 terminé").arg(i+1);
@@ -341,24 +395,23 @@ void CalibrationTestScreen::runTest() {
     qDebug() << "[CalibrationTestScreen] Déconnexion du robot";
     calib->disconnectToRobot();
 
-    // Mettre à jour l'interface
-    QMetaObject::invokeMethod(this, [this]() {
-        loadingMovie->stop();
-        loadingLabel->hide();
+    // Mettre à jour l'interface SEULEMENT si ce n'est pas un arrêt d'urgence
+    // (l'arrêt d'urgence a déjà mis à jour l'UI avec son message rouge)
+    if (!shouldStop) {
+        QMetaObject::invokeMethod(this, [this]() {
+            loadingMovie->stop();
+            loadingLabel->hide();
 
-        if (shouldStop) {
-            statusLabel->setText("Test arrêté par l'utilisateur.<br>Utilisez le bouton Retour pour revenir au menu principal.");
-            statusLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold; padding: 15px;");
-        } else {
             statusLabel->setText("Test terminé avec succès !<br>Utilisez le bouton Retour pour revenir au menu principal.");
             statusLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold; padding: 15px;");
-        }
 
-        stopButton->hide();
-        // Ne pas réafficher le bouton "Lancer le test" - l'utilisateur doit retourner au menu
-        startButton->hide();
-        backButton->show();
-    }, Qt::QueuedConnection);
+            stopButton->hide();
+            emergencyStopButton->hide();
+            // Ne pas réafficher le bouton "Lancer le test" - l'utilisateur doit retourner au menu
+            startButton->hide();
+            backButton->show();
+        }, Qt::QueuedConnection);
+    }
 
     testRunning = false;
     qDebug() << "[CalibrationTestScreen] Thread de test terminé";

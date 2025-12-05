@@ -66,6 +66,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(gameScreen, &GameScreen::countdownFinished,
             gameLogic, &GameLogic::startGame);
 
+    connect(gameScreen, &GameScreen::emergencyStopRequested, this, [this]() {
+        qDebug() << "[MainWindow] Arrêt d'urgence demandé depuis GameScreen";
+        robot->emergencyStop();
+        gameScreen->showEmergencyStopOverlay();
+    });
+
     connect(gameLogic, &GameLogic::turnPlayer,
             gameScreen, &GameScreen::setTurnPlayer);
 

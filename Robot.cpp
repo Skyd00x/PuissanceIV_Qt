@@ -54,6 +54,13 @@ void Robot::clearAlarms()
     qDebug() << "[Robot] Alarmes clearées";
 }
 
+void Robot::emergencyStop()
+{
+    qDebug() << "[Robot] ⚠️ ARRÊT D'URGENCE ACTIVÉ !";
+    SetQueuedCmdForceStopExec();
+    qDebug() << "[Robot] Toutes les commandes en cours ont été arrêtées";
+}
+
 // ============================================================================
 //  Contrôle de la vitesse
 // ============================================================================
@@ -108,7 +115,11 @@ void Robot::Home()
     std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Laisser le temps au robot de s'arrêter complètement
     qDebug() << "[Robot] Robot arrêté, prêt pour Home";
 
-    // ÉTAPE 0.5 : Fermer la pince et couper le compresseur avant de remonter
+    // ÉTAPE 0.5 : Cycle ouverture/fermeture de la pince et coupure du compresseur avant de remonter
+    qDebug() << "[Robot] Ouverture de la pince avant fermeture...";
+    openGripper();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300)); // Laisser le temps à la pince de s'ouvrir
+
     qDebug() << "[Robot] Fermeture de la pince avant Home...";
     closeGripper();
     std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Laisser le temps à la pince de se fermer

@@ -25,35 +25,33 @@ CalibrationLogic::CalibrationLogic(Robot* robot, QObject* parent)
 
     steps = {
         // Étape 0 : Instructions initiales
-        { "Videz les réservoirs, puis placez un pion dans le réservoir de gauche à l'emplacement 1.<br>"
-         "<b>Calibration optimisée</b> : vous calibrerez les points clés (1 et 4 de chaque réservoir, 1, 4 et 7 de la grille), "
-         "les positions intermédiaires seront calculées automatiquement.",
+        { "Remplissez les réservoirs gauche et droite avec le maximum de pions.<br>",
          "./Ressources/image/Calibration/Etape1.png", true, false, false, false, false, false, false },
 
         // Étapes 1-2 : Réservoir gauche (seulement 1 et 4)
-        { "Positionnez le robot à l'emplacement <b>1</b> du réservoir de gauche (premier pion).",
+        { "Positionnez le robot à l'emplacement <b>1</b> du réservoir de gauche, de façon à ce qu'il puisse prendre le pion correctement avec la pince.",
          "./Ressources/image/Calibration/Etape2.png", true, true, true, true, false, false, false },
-        { "Positionnez le robot à l'emplacement <b>4</b> du réservoir de gauche (dernier pion).",
+        { "Positionnez le robot à l'emplacement <b>4</b> du réservoir de gauche, de façon à ce qu'il puisse prendre le pion correctement avec la pince.",
          "./Ressources/image/Calibration/Etape3.png", true, true, true, true, false, false, false },
 
         // Étapes 3-4 : Réservoir droit (seulement 1 et 4)
-        { "Positionnez le robot à l'emplacement <b>1</b> du réservoir de droite (premier pion).",
+        { "Positionnez le robot à l'emplacement <b>1</b> du réservoir de droite, de façon à ce qu'il puisse prendre le pion correctement avec la pince.",
          "./Ressources/image/Calibration/Etape4.png", true, true, true, true, false, false, false },
-        { "Positionnez le robot à l'emplacement <b>4</b> du réservoir de droite (dernier pion).",
+        { "Positionnez le robot à l'emplacement <b>4</b> du réservoir de droite, de façon à ce qu'il puisse prendre le pion correctement avec la pince.",
          "./Ressources/image/Calibration/Etape5.png", true, true, true, true, false, false, false },
 
         // Étapes 5-7 : Grille (colonnes 1, 4 et 7 pour précision maximale)
-        { "Positionnez le robot à la <b>colonne 1</b> de la grille (tout à gauche).",
+        { "Avec la pince fermée tenant un pion, positionnez le à la <b>première colonne</b> de la grille, de façon à ce qu'il puisse lâcher le pion correctement.",
          "./Ressources/image/Calibration/Etape6.png", true, true, true, true, false, false, false },
-        { "Positionnez le robot à la <b>colonne 4</b> de la grille (centre).",
-         "./Ressources/image/Calibration/Etape6.png", true, true, true, true, false, false, false },
-        { "Positionnez le robot à la <b>colonne 7</b> de la grille (tout à droite).",
+        { "Avec la pince fermée tenant un pion, positionnez le à la <b>colonne centrale</b> de la grille, de façon à ce qu'il puisse lâcher le pion correctement.",
          "./Ressources/image/Calibration/Etape7.png", true, true, true, true, false, false, false },
+        { "Avec la pince fermée tenant un pion, positionnez le à la <b>dernière colonne</b> de la grille, de façon à ce qu'il puisse lâcher le pion correctement.",
+         "./Ressources/image/Calibration/Etape8.png", true, true, true, true, false, false, false },
 
         // Étape 8 : Fin
-        { "Calibration terminée !<br>"
-         "Les positions intermédiaires ont été calculées automatiquement.<br>"
-         "Vous pouvez maintenant recommencer ou retourner au menu principal.",
+        { "Calibration terminée.<br>"
+         "Toutes les positions ont été enregistrées.<br>"
+         "Vous pouvez maintenant retourner au menu principal, ou recommencer si besoin.",
          "./Ressources/image/welcome_calibration.png", false, false, false, false, false, true, true }
     };
 
@@ -132,6 +130,8 @@ void CalibrationLogic::recordStep(int index) {
     // L'étape 0 est juste l'instruction initiale, pas d'enregistrement
     if (index == 0) {
         stepIndex = 1;
+        // Compter l'étape d'instruction comme la première étape (1/8)
+        emit progressChanged(1);
         if (stepIndex < (int)steps.size())
             emit stepChanged(steps[stepIndex], stepIndex);
         return;
@@ -171,7 +171,8 @@ void CalibrationLogic::recordStep(int index) {
         qDebug() << "[CalibrationLogic] 📍 Point clé" << pointName << "enregistré : x=" << p.x << " y=" << p.y << " z=" << p.z << " r=" << p.r;
     }
 
-    emit progressChanged(index);
+    // Progression : index + 1 pour que l'étape 1 affiche 2/8, ..., l'étape 7 affiche 8/8
+    emit progressChanged(index + 1);
 
     // Dernière étape (index 7) = calculer les positions intermédiaires puis sauvegarder
     if (index == 7) {
@@ -180,8 +181,7 @@ void CalibrationLogic::recordStep(int index) {
         qDebug() << "[CalibrationLogic] 💾 Sauvegarde de tous les points...";
         saveCalibration("./calibration.json");
 
-        // Mettre la barre de progression à 100%
-        emit progressChanged(8);
+        // La progression est déjà à 8/8 grâce à progressChanged(index + 1) ci-dessus
         emit calibrationFinished();
     }
 

@@ -69,6 +69,30 @@ void GameScreen::createGameWidget()
     quitButton->setGraphicsEffect(shadowQuit);
 
     // ============================
+    //  BOUTON ARRÊT D'URGENCE
+    // ============================
+    emergencyStopButton = new QPushButton("ARRÊT D'URGENCE");
+    emergencyStopButton->setFixedSize(320, 60);
+    emergencyStopButton->setStyleSheet(
+        "QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FF0000, stop:1 #CC0000);"
+        " color: white; font-size: 20px; font-weight: bold; border-radius: 30px; }"
+        "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FF3333, stop:1 #DD0000); }"
+        "QPushButton:pressed { background-color: #990000; }"
+    );
+    emergencyStopButton->setCursor(Qt::PointingHandCursor);
+    connect(emergencyStopButton, &QPushButton::clicked, this, [this]() {
+        qDebug() << "[GameScreen] ⚠️ ARRÊT D'URGENCE activé !";
+        emit emergencyStopRequested();  // Signaler l'arrêt d'urgence à GameLogic
+    });
+
+    // Ombre pour bouton d'urgence
+    auto *shadowEmergency = new QGraphicsDropShadowEffect;
+    shadowEmergency->setBlurRadius(25);
+    shadowEmergency->setOffset(4, 4);
+    shadowEmergency->setColor(QColor(255, 0, 0, 120));
+    emergencyStopButton->setGraphicsEffect(shadowEmergency);
+
+    // ============================
     //   TITRE CENTRAL
     // ============================
     titleLabel = new QLabel("Partie en mode ");
@@ -353,6 +377,49 @@ void GameScreen::createGameWidget()
     connectionErrorLayout->addSpacing(30);
     connectionErrorLayout->addLayout(connectionErrorButtonLayout);
 
+    // ============================
+    //   OVERLAY ARRÊT D'URGENCE
+    // ============================
+    emergencyStopOverlay = new QWidget(gameWidget);
+    emergencyStopOverlay->setStyleSheet("background-color: rgba(0, 0, 0, 200);");
+    emergencyStopOverlay->hide();
+
+    QVBoxLayout *emergencyStopLayout = new QVBoxLayout(emergencyStopOverlay);
+    emergencyStopLayout->setAlignment(Qt::AlignCenter);
+
+    emergencyStopLabel = new QLabel("⚠️ ARRÊT D'URGENCE ACTIVÉ ⚠️\n\nLe robot a été arrêté immédiatement.\nLa partie est terminée.");
+    emergencyStopLabel->setAlignment(Qt::AlignCenter);
+    emergencyStopLabel->setStyleSheet(
+        "background-color: rgba(255, 0, 0, 240);"
+        "color: white;"
+        "font-size: 36px;"
+        "font-weight: bold;"
+        "padding: 40px 80px;"
+        "border-radius: 20px;"
+    );
+    emergencyStopLabel->setWordWrap(true);
+    emergencyStopLabel->setMinimumWidth(900);
+
+    auto *emergencyStopShadow = new QGraphicsDropShadowEffect;
+    emergencyStopShadow->setBlurRadius(50);
+    emergencyStopShadow->setOffset(0, 10);
+    emergencyStopShadow->setColor(QColor(255, 0, 0, 200));
+    emergencyStopLabel->setGraphicsEffect(emergencyStopShadow);
+
+    emergencyStopQuitButton = new QPushButton("Retour au menu principal");
+    emergencyStopQuitButton->setFixedSize(380, 80);
+    emergencyStopQuitButton->setStyleSheet(
+        "QPushButton { background-color: #E0E0E0; color: #1B3B5F; font-size: 26px; font-weight: bold; border-radius: 40px; }"
+        "QPushButton:hover { background-color: #D0D0D0; }"
+        "QPushButton:pressed { background-color: #A8A8A8; }"
+    );
+    emergencyStopQuitButton->setCursor(Qt::PointingHandCursor);
+    connect(emergencyStopQuitButton, &QPushButton::clicked, this, &GameScreen::onQuitButtonClicked);
+
+    emergencyStopLayout->addWidget(emergencyStopLabel);
+    emergencyStopLayout->addSpacing(40);
+    emergencyStopLayout->addWidget(emergencyStopQuitButton, 0, Qt::AlignCenter);
+
     // Layout pour le countdown centré
     QVBoxLayout *countdownLayout = new QVBoxLayout;
     countdownLayout->addStretch();
@@ -384,6 +451,8 @@ void GameScreen::createGameWidget()
     main->addLayout(topBar);
     main->addWidget(turnLabel);
     main->addWidget(cameraLabel, 1);
+    main->addSpacing(15);
+    main->addWidget(emergencyStopButton, 0, Qt::AlignCenter);
     main->addWidget(countdownWidget, 1);
     main->addStretch();
 
@@ -391,6 +460,7 @@ void GameScreen::createGameWidget()
     //   INITIALISATION : tout est caché
     // ============================
     quitButton->hide();
+    emergencyStopButton->hide();
     titleLabel->hide();
     timerLabel->hide();
     turnLabel->hide();
@@ -597,6 +667,7 @@ void GameScreen::updateCountdown()
             timerLabel->show();
             turnLabel->show();
             cameraLabel->show();
+            emergencyStopButton->show();
 
             // Démarrer le chronomètre et la partie
             chronometer.start(1000);
@@ -828,6 +899,20 @@ void GameScreen::showConnectionError()
     connectionErrorOverlay->raise();
 }
 
+void GameScreen::showEmergencyStopOverlay()
+{
+    // Arrêter le chronomètre
+    chronometer.stop();
+
+    // Revenir au gameWidget si nécessaire
+    stack->setCurrentWidget(gameWidget);
+
+    // Afficher l'overlay d'arrêt d'urgence
+    emergencyStopOverlay->setGeometry(gameWidget->rect());
+    emergencyStopOverlay->show();
+    emergencyStopOverlay->raise();
+}
+
 // ============================================================
 //   EVENT DE REDIMENSIONNEMENT
 // ============================================================
@@ -849,5 +934,8 @@ void GameScreen::resizeEvent(QResizeEvent *event)
     }
     if (connectionErrorOverlay && connectionErrorOverlay->isVisible()) {
         connectionErrorOverlay->setGeometry(gameWidget->rect());
+    }
+    if (emergencyStopOverlay && emergencyStopOverlay->isVisible()) {
+        emergencyStopOverlay->setGeometry(gameWidget->rect());
     }
 }
