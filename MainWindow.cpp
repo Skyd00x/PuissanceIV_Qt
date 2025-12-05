@@ -168,10 +168,11 @@ MainWindow::MainWindow(QWidget *parent)
         // Informer GameLogic que le robot peut avoir été déconnecté
         gameLogic->resetRobotConnection();
 
-        showMenu();
+        // Animation de retour (vers la droite)
+        animateTransition(calibrationTestScreen, mainMenu, false);
 
         // Reset de l'écran de test après transition
-        QTimer::singleShot(100, [this]() {
+        QTimer::singleShot(500, [this]() {
             calibrationTestScreen->resetScreen();
         });
     });
@@ -238,7 +239,7 @@ void MainWindow::showCalibration()
 void MainWindow::showCalibrationTest()
 {
     calibrationTestScreen->resetScreen();
-    stack->setCurrentWidget(calibrationTestScreen);
+    animateTransition(stack->currentWidget(), calibrationTestScreen, true);
 }
 
 void MainWindow::showExplanation()
@@ -253,6 +254,48 @@ void MainWindow::showGame()
 
     stack->setCurrentWidget(gameScreen);
     gameScreen->startGame();
+}
+
+// =====================================================
+//      ANIMATION DE TRANSITION
+// =====================================================
+void MainWindow::animateTransition(QWidget *from, QWidget *to, bool forward)
+{
+    if (!from || !to) return;
+
+    int w = stack->width();
+    int h = stack->height();
+
+    // Position selon la direction
+    // forward=true : vient de la gauche (x=-w au départ)
+    // forward=false : repart vers la droite (x=w à la fin)
+    int startXTo = forward ? -w : w;
+    int endXTo   = 0;
+    int endXFrom = forward ? w : -w;
+
+    to->setGeometry(startXTo, 0, w, h);
+    to->show();
+
+    auto *slideOut = new QPropertyAnimation(from, "geometry");
+    slideOut->setDuration(400);
+    slideOut->setEasingCurve(QEasingCurve::InOutQuad);
+    slideOut->setStartValue(QRect(0, 0, w, h));
+    slideOut->setEndValue(QRect(endXFrom, 0, w, h));
+
+    auto *slideIn = new QPropertyAnimation(to, "geometry");
+    slideIn->setDuration(400);
+    slideIn->setEasingCurve(QEasingCurve::InOutQuad);
+    slideIn->setStartValue(QRect(startXTo, 0, w, h));
+    slideIn->setEndValue(QRect(endXTo, 0, w, h));
+
+    connect(slideOut, &QPropertyAnimation::finished, [this, to]() {
+        stack->setCurrentWidget(to);
+    });
+
+    auto *group = new QParallelAnimationGroup(this);
+    group->addAnimation(slideOut);
+    group->addAnimation(slideIn);
+    group->start(QAbstractAnimation::DeleteWhenStopped);
 }
 
 // =====================================================

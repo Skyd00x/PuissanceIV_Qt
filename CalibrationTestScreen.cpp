@@ -20,23 +20,25 @@ CalibrationTestScreen::CalibrationTestScreen(Robot *robot, CalibrationLogic* cal
     // === TITRE ===
     titleLabel = new QLabel("Test de calibration", this);
     titleLabel->setAlignment(Qt::AlignCenter);
-    titleLabel->setStyleSheet("font-size: 48px; font-weight: bold; color: #1B3B5F;");
+    titleLabel->setStyleSheet("font-size: 60px; font-weight: bold; color: #1B3B5F;");
 
     // === INSTRUCTIONS ===
     instructionsLabel = new QLabel(
-        "<b>Avant de lancer le test, assurez-vous que :</b><br>"
-        "• Les réservoirs gauche et droit sont remplis de pions (4 pions chacun)<br>"
-        "• La grille est vide<br>"
-        "• Le robot est en position de sécurité<br>"
+        "<div style='text-align: center;'>"
+        "<b>Avant de lancer le test, assurez-vous que :</b><br><br>"
+        "• Les réservoirs sont remplis de pions,<br>"
+        "• La grille est vide.<br>"
         "<br>"
-        "Le test va récupérer les 8 pions des réservoirs et les déposer dans la grille.",
+        "Le test va récupérer les 8 pions des réservoirs et les déposer dans la grille."
+        "</div>",
         this
     );
-    instructionsLabel->setAlignment(Qt::AlignCenter);
+    instructionsLabel->setAlignment(Qt::AlignCenter);  // Centre le QLabel lui-même
     instructionsLabel->setWordWrap(true);
     instructionsLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold; padding: 20px;");
-    instructionsLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    instructionsLabel->setMinimumWidth(900);
+    instructionsLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    instructionsLabel->setMinimumHeight(200);  // Hauteur minimale pour afficher tout le texte
+    instructionsLabel->setMinimumWidth(900);  // Largeur minimale pour éviter la coupure
 
     // === STATUT ===
     statusLabel = new QLabel("", this);
@@ -45,6 +47,7 @@ CalibrationTestScreen::CalibrationTestScreen(Robot *robot, CalibrationLogic* cal
     statusLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold; padding: 25px; line-height: 1.5;");
     statusLabel->setMinimumHeight(120);  // Hauteur minimale encore augmentée pour éviter que le texte soit coupé
     statusLabel->setMaximumHeight(150);  // Hauteur maximale pour contrôler l'expansion
+    statusLabel->setMinimumWidth(700);  // Largeur minimale pour afficher les messages longs
     statusLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     statusLabel->hide();
 
@@ -74,7 +77,7 @@ CalibrationTestScreen::CalibrationTestScreen(Robot *robot, CalibrationLogic* cal
     // === BOUTONS ===
     startButton = new QPushButton("Lancer le test");
     stopButton = new QPushButton("Arrêter le test");
-    backButton = new QPushButton("Retour au menu");
+    backButton = new QPushButton("Retour");
 
     stopButton->hide();
 
@@ -84,17 +87,19 @@ CalibrationTestScreen::CalibrationTestScreen(Robot *robot, CalibrationLogic* cal
     buttonLayout->addWidget(startButton);
     buttonLayout->addWidget(stopButton);
 
-    // Style du bouton retour (différent des autres)
-    backButton->setFixedSize(200, 60);
+    // Style du bouton retour (même style que dans MainMenu)
+    backButton->setFixedSize(160, 55);
     backButton->setStyleSheet(
         "QPushButton { background-color: #E0E0E0; color: #1B3B5F;"
-        " font-size: 22px; font-weight: bold; border-radius: 30px; }"
+        " font-size: 22px; font-weight: bold; border-radius: 27px; }"
         "QPushButton:hover { background-color: #D0D0D0; }"
         "QPushButton:pressed { background-color: #A8A8A8; }"
     );
     backButton->setCursor(Qt::PointingHandCursor);
 
     // === LAYOUT ===
+    mainLayout->addWidget(backButton, 0, Qt::AlignLeft);
+    mainLayout->addSpacing(20);
     mainLayout->addWidget(titleLabel, 0, Qt::AlignCenter);
     mainLayout->addSpacing(20);
     mainLayout->addWidget(instructionsLabel, 0, Qt::AlignCenter);
@@ -105,7 +110,6 @@ CalibrationTestScreen::CalibrationTestScreen(Robot *robot, CalibrationLogic* cal
     mainLayout->addSpacing(40);
     mainLayout->addLayout(buttonLayout);
     mainLayout->addStretch();
-    mainLayout->addWidget(backButton, 0, Qt::AlignLeft);
 
     // === STYLE DES BOUTONS ===
     styleButton(startButton, "#2ECC71", "#27AE60");
@@ -136,7 +140,7 @@ void CalibrationTestScreen::resetScreen() {
 
     startButton->show();
     stopButton->hide();
-    backButton->setEnabled(true);
+    backButton->show();
 }
 
 void CalibrationTestScreen::onStartTestClicked() {
@@ -158,8 +162,8 @@ void CalibrationTestScreen::onStartTestClicked() {
     startButton->hide();
     stopButton->show();
 
-    // Désactiver le bouton retour pendant le test
-    backButton->setEnabled(false);
+    // Masquer le bouton retour pendant le test
+    backButton->hide();
 
     // Lancer le test dans un thread séparé
     testRunning = true;
@@ -211,7 +215,7 @@ void CalibrationTestScreen::runTest() {
             loadingLabel->hide();
             stopButton->hide();
             startButton->show();
-            backButton->setEnabled(true);
+            backButton->show();
         }, Qt::QueuedConnection);
         testRunning = false;
         return;
@@ -328,7 +332,12 @@ void CalibrationTestScreen::runTest() {
         qDebug() << QString("[CalibrationTestScreen] Test %1/8 terminé").arg(i+1);
     }
 
-    // Déconnexion (pas de retour à la position d'origine)
+    // Positionnement au-dessus du réservoir gauche avant de déconnecter
+    qDebug() << "[CalibrationTestScreen] Déplacement au-dessus du réservoir gauche...";
+    calib->goToLeftReservoirArea();
+    qDebug() << "[CalibrationTestScreen] Positionné au-dessus du réservoir gauche";
+
+    // Déconnexion
     qDebug() << "[CalibrationTestScreen] Déconnexion du robot";
     calib->disconnectToRobot();
 
@@ -338,16 +347,17 @@ void CalibrationTestScreen::runTest() {
         loadingLabel->hide();
 
         if (shouldStop) {
-            statusLabel->setText("Test arrêté par l'utilisateur");
+            statusLabel->setText("Test arrêté par l'utilisateur.<br>Utilisez le bouton Retour pour revenir au menu principal.");
             statusLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold; padding: 15px;");
         } else {
-            statusLabel->setText("✅ Test terminé avec succès !");
+            statusLabel->setText("Test terminé avec succès !<br>Utilisez le bouton Retour pour revenir au menu principal.");
             statusLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold; padding: 15px;");
         }
 
         stopButton->hide();
-        startButton->show();
-        backButton->setEnabled(true);
+        // Ne pas réafficher le bouton "Lancer le test" - l'utilisateur doit retourner au menu
+        startButton->hide();
+        backButton->show();
     }, Qt::QueuedConnection);
 
     testRunning = false;

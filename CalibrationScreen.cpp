@@ -418,6 +418,11 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     connect(menuButton, &QPushButton::clicked, this, [this]() {
         qDebug() << "[CalibrationScreen] Bouton menu cliqué - nettoyage avant de quitter";
 
+        // Positionner le robot au-dessus du réservoir gauche avant de déconnecter
+        qDebug() << "[CalibrationScreen] Déplacement au-dessus du réservoir gauche...";
+        logic->goToLeftReservoirArea();
+        qDebug() << "[CalibrationScreen] Positionné au-dessus du réservoir gauche";
+
         // Déconnexion propre avant de retourner au menu
         logic->disconnectToRobot();
         currentStep = 0;
@@ -542,8 +547,11 @@ void CalibrationScreen::onRestartClicked() {
     logic->resetCalibration();
     currentStep = 0;
 
-    // Plus de remise en position initiale à la sortie (évite les conflits)
-    // Le robot sera remis en position initiale au prochain lancement de calibration/partie
+    // Positionner le robot au-dessus du réservoir gauche avant de retourner au menu
+    qDebug() << "[CalibrationScreen] Déplacement au-dessus du réservoir gauche...";
+    logic->goToLeftReservoirArea();
+    qDebug() << "[CalibrationScreen] Positionné au-dessus du réservoir gauche";
+
     prepareIntroUI("<b>Retour au menu...</b>");
     showIntroLayout(false);
     startButton->hide();

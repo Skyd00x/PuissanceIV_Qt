@@ -108,6 +108,15 @@ void Robot::Home()
     std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Laisser le temps au robot de s'arrêter complètement
     qDebug() << "[Robot] Robot arrêté, prêt pour Home";
 
+    // ÉTAPE 0.5 : Fermer la pince et couper le compresseur avant de remonter
+    qDebug() << "[Robot] Fermeture de la pince avant Home...";
+    closeGripper();
+    std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Laisser le temps à la pince de se fermer
+
+    qDebug() << "[Robot] Coupure du compresseur...";
+    turnOffGripper();
+    std::this_thread::sleep_for(std::chrono::milliseconds(200)); // Laisser le temps au compresseur de se couper
+
     // ÉTAPE 1 : Monter à la hauteur de sécurité (Z de la grille = 104.0f)
     qDebug() << "[Robot] Récupération de la position actuelle...";
     Pose current;

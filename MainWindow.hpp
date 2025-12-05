@@ -3,6 +3,8 @@
 #include <QMainWindow>
 #include <QStackedWidget>
 #include <QApplication>
+#include <QPropertyAnimation>
+#include <QParallelAnimationGroup>
 
 #include "Robot.hpp"
 #include "CameraAi.hpp"
@@ -42,6 +44,8 @@ public:
     StateMachine stateMachine; // ← doit être public pour debug
 
 private:
+    void animateTransition(QWidget *from, QWidget *to, bool forward);
+
     QStackedWidget *stack = nullptr;
 
     Robot      *robot     = nullptr;
