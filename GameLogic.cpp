@@ -109,6 +109,11 @@ void GameLogic::prepareGame()
             robot->turnOffGripper();
             qDebug() << "[GameLogic] Pince fermée";
 
+            // Se positionner au-dessus du réservoir gauche pour être prêt à jouer
+            qDebug() << "[GameLogic] Déplacement au-dessus du réservoir gauche...";
+            calib->goToLeftReservoirArea();
+            qDebug() << "[GameLogic] Positionné au-dessus du réservoir gauche";
+
             // Marquer comme prêt
             robotConnected = true;
             preparationRunning = false;

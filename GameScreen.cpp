@@ -14,9 +14,11 @@ GameScreen::GameScreen(QWidget *parent)
 
     // === STACK PRINCIPAL ===
     stack = new QStackedWidget(this);
+    createInitializingWidget();
     createGameWidget();
     createConfirmWidget();
 
+    stack->addWidget(initializingWidget);
     stack->addWidget(gameWidget);
     stack->addWidget(confirmWidget);
     stack->setCurrentWidget(gameWidget);
@@ -157,35 +159,6 @@ void GameScreen::createGameWidget()
     overlayLayout->addSpacing(30);
     overlayLayout->addWidget(warningQuitButton, 0, Qt::AlignCenter);
 
-    // ============================
-    //   OVERLAY MISE EN POSITION INITIALE
-    // ============================
-    initializingOverlay = new QWidget(gameWidget);
-    initializingOverlay->setStyleSheet("background-color: rgba(0, 0, 0, 150);");
-    initializingOverlay->hide();
-
-    QVBoxLayout *initLayout = new QVBoxLayout(initializingOverlay);
-    initLayout->setAlignment(Qt::AlignCenter);
-
-    initializingLabel = new QLabel("Mise en position initiale du robot...");
-    initializingLabel->setAlignment(Qt::AlignCenter);
-    initializingLabel->setStyleSheet(
-        "background-color: rgba(27, 59, 95, 230);"
-        "color: white;"
-        "font-size: 32px;"
-        "font-weight: bold;"
-        "padding: 35px 120px;"
-        "border-radius: 15px;"
-        );
-    initializingLabel->setMinimumWidth(900);
-
-    auto *initShadow = new QGraphicsDropShadowEffect;
-    initShadow->setBlurRadius(40);
-    initShadow->setOffset(0, 8);
-    initShadow->setColor(QColor(0, 0, 0, 180));
-    initializingLabel->setGraphicsEffect(initShadow);
-
-    initLayout->addWidget(initializingLabel);
 
     // ============================
     //   OVERLAY TRICHE DÉTECTÉE
@@ -485,6 +458,38 @@ void GameScreen::createConfirmWidget()
 }
 
 // ============================================================
+// CRÉATION DU WIDGET D'INITIALISATION
+// ============================================================
+void GameScreen::createInitializingWidget()
+{
+    initializingWidget = new QWidget(this);
+
+    QVBoxLayout* layout = new QVBoxLayout(initializingWidget);
+    layout->setAlignment(Qt::AlignCenter);
+    layout->setSpacing(40);
+    layout->setContentsMargins(100, 50, 100, 50);
+
+    // Label de statut (comme dans CalibrationScreen)
+    initializingLabel = new QLabel("Mise en position initiale du robot...", initializingWidget);
+    initializingLabel->setAlignment(Qt::AlignCenter);
+    initializingLabel->setWordWrap(true);
+    initializingLabel->setStyleSheet("font-size: 26px; color: #1B3B5F; font-weight: bold;");
+    initializingLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    initializingLabel->setMinimumWidth(900);
+
+    // Animation de chargement (comme dans CalibrationScreen)
+    initializingLoadingLabel = new QLabel(initializingWidget);
+    initializingLoadingMovie = new QMovie("./Ressources/image/Gifs/simple_loading.gif");
+    initializingLoadingLabel->setMovie(initializingLoadingMovie);
+    initializingLoadingLabel->setFixedSize(85, 85);
+    initializingLoadingLabel->setScaledContents(true);
+    initializingLoadingLabel->setAlignment(Qt::AlignCenter);
+
+    layout->addWidget(initializingLabel, 0, Qt::AlignCenter);
+    layout->addWidget(initializingLoadingLabel, 0, Qt::AlignCenter);
+}
+
+// ============================================================
 // RÉINITIALISATION COMPLÈTE DE L'ÉCRAN DE JEU
 // ============================================================
 void GameScreen::resetGame()
@@ -506,7 +511,6 @@ void GameScreen::resetGame()
 
     // Cacher tous les overlays
     resetAllOverlays();
-    initializingOverlay->hide();
     cheatOverlay->hide();
     reservoirOverlay->hide();
     resultOverlay->hide();
@@ -720,14 +724,14 @@ void GameScreen::showGridIncompleteWarning(int detectedCount)
 // ============================================================
 void GameScreen::showRobotInitializing()
 {
-    initializingOverlay->setGeometry(gameWidget->rect());
-    initializingOverlay->show();
-    initializingOverlay->raise();
+    initializingLoadingMovie->start();
+    stack->setCurrentWidget(initializingWidget);
 }
 
 void GameScreen::hideRobotInitializing()
 {
-    initializingOverlay->hide();
+    initializingLoadingMovie->stop();
+    stack->setCurrentWidget(gameWidget);
 }
 
 // ============================================================
@@ -757,7 +761,6 @@ void GameScreen::showReservoirEmpty()
 void GameScreen::resetAllOverlays()
 {
     warningOverlay->hide();
-    initializingOverlay->hide();
     cheatOverlay->hide();
     // NE PAS cacher reservoirOverlay - il est prioritaire et ne peut être fermé que par le bouton
 }
@@ -805,8 +808,8 @@ bool GameScreen::isReservoirOverlayVisible() const
 // ============================================================
 void GameScreen::showConnectionError()
 {
-    // Cacher l'overlay d'initialisation si affiché
-    initializingOverlay->hide();
+    // Revenir au gameWidget si on était sur l'écran d'initialisation
+    stack->setCurrentWidget(gameWidget);
 
     // Afficher l'overlay d'erreur de connexion
     connectionErrorOverlay->setGeometry(gameWidget->rect());
@@ -823,9 +826,6 @@ void GameScreen::resizeEvent(QResizeEvent *event)
     // Redimensionner les overlays s'ils sont visibles
     if (warningOverlay && warningOverlay->isVisible()) {
         warningOverlay->setGeometry(gameWidget->rect());
-    }
-    if (initializingOverlay && initializingOverlay->isVisible()) {
-        initializingOverlay->setGeometry(gameWidget->rect());
     }
     if (cheatOverlay && cheatOverlay->isVisible()) {
         cheatOverlay->setGeometry(gameWidget->rect());

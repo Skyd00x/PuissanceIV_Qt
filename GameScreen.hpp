@@ -8,6 +8,7 @@
 #include <QHBoxLayout>
 #include <QGraphicsDropShadowEffect>
 #include <QStackedWidget>
+#include <QMovie>
 
 class GameScreen : public QWidget
 {
@@ -58,11 +59,13 @@ private:
     void startCountdown();
     void createGameWidget();
     void createConfirmWidget();
+    void createInitializingWidget();
 
 private:
     QStackedWidget *stack;
 
     // Widgets
+    QWidget *initializingWidget;   // Widget d'initialisation (avant le jeu)
     QWidget *gameWidget;
     QWidget *confirmWidget;
 
@@ -86,9 +89,10 @@ private:
     QWidget *warningOverlay;     // Widget overlay pour le message
     QPushButton *warningQuitButton; // Bouton pour quitter quand grille incomplète
 
-    // Overlay pour mise en position initiale
-    QWidget *initializingOverlay;
-    QLabel *initializingLabel;
+    // Éléments du widget d'initialisation
+    QLabel *initializingLabel;          // Label de statut (ex: "Mise en position initiale...")
+    QLabel *initializingLoadingLabel;   // Label pour le GIF de chargement
+    QMovie *initializingLoadingMovie;   // Animation de chargement
 
     // Overlay pour triche détectée
     QWidget *cheatOverlay;
