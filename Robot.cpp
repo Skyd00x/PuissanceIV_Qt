@@ -98,21 +98,44 @@ void Robot::setPrecisionSpeed()
 // ============================================================================
 void Robot::Home()
 {
-    qDebug() << "[Robot] ==== DÉBUT Home() ====";
+    qDebug() << "[Robot] 🔒 Home() - Tentative de verrouillage du mutex...";
+    QMutexLocker locker(&robotMutex);  // Verrouille le mutex pour toute la durée de la fonction
+    qDebug() << "[Robot] ✅ ==== DÉBUT Home() ==== (Mutex verrouillé, accès exclusif au robot)";
 
-    // ÉTAPE 1 : Monter en Z+150 pour éviter les collisions
+    // ÉTAPE 0 : FORCER L'ARRÊT de toute commande en cours pour éviter les conflits
+    qDebug() << "[Robot] Arrêt forcé de toute commande en cours...";
+    SetQueuedCmdForceStopExec();
+    std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Laisser le temps au robot de s'arrêter complètement
+    qDebug() << "[Robot] Robot arrêté, prêt pour Home";
+
+    // ÉTAPE 1 : Monter à la hauteur de sécurité (Z de la grille = 104.0f)
     qDebug() << "[Robot] Récupération de la position actuelle...";
     Pose current;
     GetPose(&current);
     qDebug() << "[Robot] Position actuelle : X=" << current.x << " Y=" << current.y << " Z=" << current.z << " R=" << current.r;
 
-    // Créer une nouvelle position avec Z+150
+    // Créer une nouvelle position avec le Z du point générique de la grille (104.0f)
+    // Cette hauteur est la même que celle utilisée dans la calibration
+    const float GRID_SAFE_Z = 104.0f;  // Hauteur du point générique au-dessus de la grille
     Pose safePos = current;
-    safePos.z += 150.0f;
-    qDebug() << "[Robot] Montée à Z+150 : Z=" << safePos.z;
+    safePos.z = GRID_SAFE_Z;
+    qDebug() << "[Robot] Montée à la hauteur de sécurité (Z grille) : Z=" << GRID_SAFE_Z;
+
+    // Effacer la queue et préparer pour la montée
+    SetQueuedCmdClear();
+    SetQueuedCmdStartExec();
 
     // Monter à la position de sécurité
-    goTo(safePos);
+    PTPCmd cmd = {0};
+    cmd.ptpMode = PTPMOVJXYZMode;
+    cmd.x = safePos.x;
+    cmd.y = safePos.y;
+    cmd.z = safePos.z;
+    cmd.r = safePos.r;
+
+    uint64_t safeIdx = 0;
+    SetPTPCmd(&cmd, true, &safeIdx);
+    waitForCompletion(safeIdx);
     qDebug() << "[Robot] Position de sécurité atteinte";
 
     // ÉTAPE 2 : Retour à la position Home
@@ -126,9 +149,23 @@ void Robot::Home()
     qDebug() << "[Robot] Appel SetHOMECmd() - Cette commande peut faire plusieurs mouvements physiques";
     SetHOMECmd(&homeCmd, true, &idx);
 
-    qDebug() << "[Robot] Attente de la fin du mouvement (idx=" << idx << ")...";
+    qDebug() << "[Robot] Attente de la fin du mouvement Home (idx=" << idx << ")...";
     waitForCompletion(idx);
-    qDebug() << "[Robot] ==== FIN Home() ====";
+
+    // CRITIQUE : Attente supplémentaire pour garantir que le mouvement physique est VRAIMENT terminé
+    // La commande HOME peut prendre plusieurs secondes, on attend que la queue soit complètement vide
+    qDebug() << "[Robot] Home() - Vérification finale que la queue est vide...";
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    uint64_t finalIndex = 0;
+    GetQueuedCmdCurrentIndex(&finalIndex);
+    qDebug() << "[Robot] Home() - Index final de la queue : " << finalIndex << " (devrait être >= " << idx << ")";
+
+    // Attendre un peu de plus pour que le robot se stabilise physiquement
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    qDebug() << "[Robot] ==== FIN Home() ==== (Mouvement physique terminé, Mutex déverrouillé)";
+    // Le mutex sera automatiquement déverrouillé à la sortie de la fonction (QMutexLocker)
 }
 
 // ============================================================================
@@ -136,6 +173,9 @@ void Robot::Home()
 // ============================================================================
 void Robot::goTo(Pose p, bool precise)
 {
+    QMutexLocker locker(&robotMutex);  // Verrouille le mutex
+    qDebug() << "[Robot] goTo() - Mutex verrouillé";
+
     // Clear les alarmes avant le mouvement pour éviter les blocages
     clearAlarms();
 
@@ -159,10 +199,16 @@ void Robot::goTo(Pose p, bool precise)
     if (precise) {
         setNormalSpeed();
     }
+
+    qDebug() << "[Robot] goTo() - Mutex déverrouillé";
 }
 
 void Robot::goToSecurized(Pose target, float safeZ)
 {
+    qDebug() << "[Robot] 🔒 goToSecurized() - Tentative de verrouillage du mutex...";
+    QMutexLocker locker(&robotMutex);  // Verrouille le mutex (récursif)
+    qDebug() << "[Robot] ✅ goToSecurized() - Mutex verrouillé (vers X=" << target.x << ", Y=" << target.y << ", Z=" << target.z << ")";
+
     // === SYSTÈME DE POINTS DE PASSAGE POUR ÉVITER LES COLLISIONS ===
     // 1. Monter à la hauteur de sécurité (safeZ)
     // 2. Se déplacer horizontalement à safeZ
@@ -196,11 +242,14 @@ void Robot::goToSecurized(Pose target, float safeZ)
     qDebug() << "[Robot] Étape 4/4 : Descente PRÉCISE finale à z=" << target.z;
     goTo(target, true);  // VITESSE RÉDUITE pour la précision
 
-    qDebug() << "[Robot] Déplacement sécurisé terminé";
+    qDebug() << "[Robot] Déplacement sécurisé terminé - Mutex déverrouillé";
 }
 
 void Robot::rotate(float delta)
 {
+    QMutexLocker locker(&robotMutex);  // Verrouille le mutex
+    qDebug() << "[Robot] rotate() - Mutex verrouillé";
+
     // Clear les alarmes avant le mouvement
     clearAlarms();
 
@@ -227,10 +276,15 @@ void Robot::rotate(float delta)
     SetPTPCmd(&cmd, true, &idx);
 
     waitForCompletion(idx);
+
+    qDebug() << "[Robot] rotate() - Mutex déverrouillé";
 }
 
 void Robot::moveAxis(char axis, float delta)
 {
+    QMutexLocker locker(&robotMutex);  // Verrouille le mutex
+    qDebug() << "[Robot] moveAxis() - Mutex verrouillé";
+
     // Clear les alarmes avant le mouvement
     clearAlarms();
 
@@ -276,10 +330,15 @@ void Robot::moveAxis(char axis, float delta)
     SetPTPCmd(&cmd, true, &idx);
 
     waitForCompletion(idx);
+
+    qDebug() << "[Robot] moveAxis() - Mutex déverrouillé";
 }
 
 uint64_t Robot::moveAxisContinuous(char axis, float delta)
 {
+    QMutexLocker locker(&robotMutex);  // Verrouille le mutex
+    qDebug() << "[Robot] moveAxisContinuous() - Mutex verrouillé (non-bloquant)";
+
     // Version non-bloquante pour mouvements continus (retourne l'index de la commande)
     // Récupère la pose actuelle
     Pose p;
@@ -313,6 +372,8 @@ uint64_t Robot::moveAxisContinuous(char axis, float delta)
 
     uint64_t idx = 0;
     SetPTPCmd(&cmd, false, &idx);  // false = ne pas clear la queue
+
+    qDebug() << "[Robot] moveAxisContinuous() - Commande envoyée, Mutex déverrouillé";
     return idx;  // Retourne l'index pour vérifier la complétion
 }
 
@@ -333,6 +394,10 @@ void Robot::turnOffGripper() { gripper(false, false); }
 
 void Robot::gripper(bool enable, bool grip)
 {
+    qDebug() << "[Robot] 🔒 gripper() - Tentative de verrouillage du mutex...";
+    QMutexLocker locker(&robotMutex);  // Verrouille le mutex
+    qDebug() << "[Robot] ✅ gripper() - Mutex verrouillé (enable=" << enable << ", grip=" << grip << ")";
+
     uint64_t idx = 0;
 
     SetQueuedCmdClear();
@@ -340,21 +405,63 @@ void Robot::gripper(bool enable, bool grip)
     SetEndEffectorGripper(enable, grip, true, &idx);
 
     waitForCompletion(idx);
+
+    qDebug() << "[Robot] gripper() - Mutex déverrouillé";
 }
 
 // ============================================================================
-//  Attente de fin d'exécution
+//  Attente de fin d'exécution (avec timeout et détection de blocage)
 // ============================================================================
 void Robot::waitForCompletion(uint64_t targetIndex)
 {
-    uint64_t currentIndex = 0;
+    const int TIMEOUT_SECONDS = 90;  // Timeout global augmenté (Home peut être très long)
+    const int STUCK_THRESHOLD = 400;  // 400 x 50ms = 20 secondes sans mouvement (Home peut être lent)
 
-    // Boucle tant que l’index courant n’a pas atteint la commande visée
+    auto start = std::chrono::steady_clock::now();
+    uint64_t currentIndex = 0;
+    uint64_t lastIndex = 0;
+    int stuckCount = 0;
+
+    qDebug() << "[Robot] ⏳ Attente de la commande idx=" << targetIndex << " (timeout=" << TIMEOUT_SECONDS << "s, stuck=" << (STUCK_THRESHOLD*50)/1000 << "s)";
+
     while (true)
     {
         GetQueuedCmdCurrentIndex(&currentIndex);
-        if (currentIndex >= targetIndex)
-            break;
+
+        // Succès : l'index a atteint ou dépassé la commande visée
+        if (currentIndex >= targetIndex) {
+            qDebug() << "[Robot] ✅ Commande terminée (currentIndex=" << currentIndex << ", target=" << targetIndex << ")";
+            return;
+        }
+
+        // Détection de blocage : l'index ne progresse plus
+        if (currentIndex == lastIndex) {
+            stuckCount++;
+            if (stuckCount >= STUCK_THRESHOLD) {
+                qWarning() << "[Robot] ⚠️ ATTENTION : Le robot semble bloqué (index=" << currentIndex << " depuis " << (STUCK_THRESHOLD*50)/1000 << "s, target=" << targetIndex << ")";
+                qWarning() << "[Robot] Vérifier les alarmes et l'état du robot";
+                // NE PAS retourner immédiatement, vérifier le timeout global d'abord
+                // pour donner plus de temps aux mouvements très lents
+            }
+        } else {
+            // L'index a bougé, réinitialiser le compteur de blocage
+            if (stuckCount > 0) {
+                qDebug() << "[Robot] ⏩ Index progresse: " << lastIndex << " -> " << currentIndex;
+            }
+            stuckCount = 0;
+        }
+        lastIndex = currentIndex;
+
+        // Vérification du timeout global
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::steady_clock::now() - start
+        ).count();
+
+        if (elapsed > TIMEOUT_SECONDS) {
+            qWarning() << "[Robot] ⏱️ TIMEOUT : La commande n'a pas terminé après " << TIMEOUT_SECONDS << "s";
+            qWarning() << "[Robot] currentIndex=" << currentIndex << ", targetIndex=" << targetIndex;
+            return;
+        }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }

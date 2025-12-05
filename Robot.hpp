@@ -3,6 +3,7 @@
 #include <thread>
 #include <chrono>
 #include <QObject>
+#include <QMutex>
 #include <qdebug.h>
 #include <algorithm>
 // === SDK Dobot Magician ===
@@ -50,7 +51,12 @@ private:
     // === Méthode interne pour le gripper ===
     void gripper(bool enable, bool grip);
 
-    // === Attente que la file d’attente du robot atteigne un index ===
+    // === Attente que la file d'attente du robot atteigne un index ===
     void waitForCompletion(uint64_t targetIndex);
+
+    // === Mutex récursif pour protéger l'accès concurrent au robot ===
+    // Utilisation d'un QRecursiveMutex pour permettre les appels imbriqués
+    // (ex: goToSecurized() appelle goTo() plusieurs fois)
+    QRecursiveMutex robotMutex;
 };
 

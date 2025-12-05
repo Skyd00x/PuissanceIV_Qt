@@ -78,53 +78,46 @@ void GameLogic::prepareGame()
         }
         preparationRunning = true;
 
-        // Lancer la préparation du robot dans un thread séparé pour ne pas bloquer l'UI
-        preparationThreadObj = QThread::create([this]() {
+        // Lancer la préparation dans un thread séparé pour ne pas bloquer l'UI
+        std::thread([this]() {
             qDebug() << "[GameLogic] Thread de préparation démarré";
 
+            // Connexion au robot
             qDebug() << "[GameLogic] Connexion au robot...";
+            QMetaObject::invokeMethod(this, [this]() { emit robotInitializing(); }, Qt::QueuedConnection);
+
             if (!calib->connectToRobot()) {
                 qWarning() << "[GameLogic] ERREUR : Impossible de se connecter au robot !";
-                emit connectionFailed();
+                QMetaObject::invokeMethod(this, [this]() { emit connectionFailed(); }, Qt::QueuedConnection);
                 preparationRunning = false;
                 robotConnected = false;
                 return;
             }
             qDebug() << "[GameLogic] Robot connecté avec succès";
 
-            // Reset à la position d'origine avec affichage du message (seulement à la première connexion)
-            qDebug() << "[GameLogic] === DÉBUT REMISE EN POSITION INITIALE ===";
-            emit robotInitializing();
-            qDebug() << "[GameLogic] Appel de robot->Home()...";
+            // Remise en position initiale DIRECTEMENT via robot->Home()
+            qDebug() << "[GameLogic] === REMISE EN POSITION INITIALE ===";
+            qDebug() << "[GameLogic] ⚠️ APPEL UNIQUE À robot->Home() depuis GameLogic::prepareGame() thread";
             robot->Home();
-            qDebug() << "[GameLogic] Home() terminé, attente 2 secondes...";
-            std::this_thread::sleep_for(std::chrono::seconds(2));
-            qDebug() << "[GameLogic] Attente terminée";
+            qDebug() << "[GameLogic] ✅ robot->Home() TERMINÉ depuis GameLogic::prepareGame() thread";
+            qDebug() << "[GameLogic] Remise en position initiale terminée";
 
-            // Fermer la pince après le retour à la position initiale
+            // Fermer la pince pour être prêt à jouer
+            qDebug() << "[GameLogic] Fermeture de la pince...";
             robot->closeGripper();
             std::this_thread::sleep_for(std::chrono::milliseconds(300));
-            robot->turnOffGripper();  // Couper le compresseur pour réduire le bruit
+            robot->turnOffGripper();
+            qDebug() << "[GameLogic] Pince fermée";
 
-            // Vérifier que la pince est bien fermée (état initial avant le début de la partie)
-            qDebug() << "[GameLogic] Vérification de l'état de la pince : fermée";
-
-            // Aller au-dessus du réservoir gauche pour être prêt à commencer
-            qDebug() << "[GameLogic] Déplacement au-dessus du réservoir gauche...";
-            calib->goToLeftReservoirArea();
-            qDebug() << "[GameLogic] Positionné au-dessus du réservoir gauche";
-
-            qDebug() << "[GameLogic] Robot en position initiale et prêt à jouer";
-            emit robotInitialized();
-
+            // Marquer comme prêt
             robotConnected = true;
             preparationRunning = false;
 
-            qDebug() << "[GameLogic] Thread de préparation terminé";
-        });
+            qDebug() << "[GameLogic] Robot prêt à jouer";
+            QMetaObject::invokeMethod(this, [this]() { emit robotInitialized(); }, Qt::QueuedConnection);
 
-        preparationThreadObj->start();
-        qDebug() << "[GameLogic] Thread de préparation lancé";
+            qDebug() << "[GameLogic] Thread de préparation terminé";
+        }).detach();
     } else {
         qDebug() << "[GameLogic] Robot déjà connecté, pas de Home() nécessaire";
         // Émettre robotInitialized immédiatement car on n'affiche pas l'overlay
@@ -184,20 +177,8 @@ void GameLogic::stopGame()
     currentTurn = PlayerTurn;
     lastRobotColumn = -1;
 
-    // Attendre proprement la fin du thread de préparation
-    if (preparationThreadObj) {
-        if (preparationThreadObj->isRunning()) {
-            qDebug() << "[GameLogic] Attente de la fin du thread de préparation...";
-            preparationThreadObj->quit();
-            if (!preparationThreadObj->wait(5000)) {
-                qWarning() << "[GameLogic] Le thread de préparation n'a pas pu se terminer proprement, terminaison forcée";
-                preparationThreadObj->terminate();
-                preparationThreadObj->wait();
-            }
-        }
-        delete preparationThreadObj;
-        preparationThreadObj = nullptr;
-    }
+    // Le thread de Home() de CalibrationLogic s'arrêtera automatiquement
+    // via disconnectToRobot() plus bas
 
     // Attendre proprement la fin du thread du robot
     if (negamaxThreadObj) {

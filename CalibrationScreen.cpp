@@ -487,6 +487,13 @@ void CalibrationScreen::onConnectionFinished(bool success) {
         return;
     }
 
+    // ⚠️ NE PAS appeler homeRobot() si l'écran n'est pas visible
+    // (évite le conflit avec GameLogic ou CalibrationTestScreen)
+    if (!this->isVisible()) {
+        qDebug() << "[CalibrationScreen] Connexion réussie mais écran non visible, pas de Home()";
+        return;
+    }
+
     introLabel->setText("Remise en position initiale du robot");
     startButton->hide();
     retryButton->hide();
@@ -535,17 +542,15 @@ void CalibrationScreen::onRestartClicked() {
     logic->resetCalibration();
     currentStep = 0;
 
-    prepareIntroUI("<b>Remise en position initiale du robot...</b>");
-    showIntroLayout(false); // pas de connect ici
+    // Plus de remise en position initiale à la sortie (évite les conflits)
+    // Le robot sera remis en position initiale au prochain lancement de calibration/partie
+    prepareIntroUI("<b>Retour au menu...</b>");
+    showIntroLayout(false);
     startButton->hide();
     progressBar->hide();
 
-    loadingLabel->show();
-    loadingMovie->start();
-
-    QTimer::singleShot(200, [this]() {
-        logic->homeRobot();
-    });
+    // Émettre directement le signal de retour au menu
+    emit backToMenuRequested();
 }
 
 // === OUTILS ===

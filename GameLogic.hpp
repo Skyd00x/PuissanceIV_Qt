@@ -83,8 +83,7 @@ private:
     QThread* negamaxThreadObj = nullptr;
     std::atomic<bool> negamaxRunning = false;
 
-    // Thread pour la préparation du robot
-    QThread* preparationThreadObj = nullptr;
+    // Flag pour la préparation du robot (géré par CalibrationLogic::homeRobot())
     std::atomic<bool> preparationRunning = false;
 
     // Compteurs de pions dans les réservoirs (initialisés à plein)

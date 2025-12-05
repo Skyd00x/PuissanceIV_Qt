@@ -290,7 +290,7 @@ std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR)
     conf = conf.to(torch::kCPU);
     labels = labels.to(torch::kCPU);
 
-    const float iouTh = 0.45f;
+    const float iouTh = 0.5f;
     std::vector<cv::Rect> finalBoxes;
     std::vector<float>    finalScores;
     std::vector<int>      finalClasses;

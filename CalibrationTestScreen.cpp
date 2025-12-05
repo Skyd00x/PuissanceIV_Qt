@@ -328,20 +328,7 @@ void CalibrationTestScreen::runTest() {
         qDebug() << QString("[CalibrationTestScreen] Test %1/8 terminé").arg(i+1);
     }
 
-    // Retour à la position d'origine
-    if (!shouldStop) {
-        qDebug() << "[CalibrationTestScreen] Retour à la position d'origine...";
-        QMetaObject::invokeMethod(this, [this]() {
-            statusLabel->setText("Retour à la position initiale...");
-            loadingLabel->show();
-            loadingMovie->start();
-        }, Qt::QueuedConnection);
-
-        robot->Home();
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-    }
-
-    // Déconnexion
+    // Déconnexion (pas de retour à la position d'origine)
     qDebug() << "[CalibrationTestScreen] Déconnexion du robot";
     calib->disconnectToRobot();
 
