@@ -87,17 +87,26 @@ void MainMenu::createMainMenu()
 {
     mainMenuWidget = new QWidget(this);
 
-    // === IMAGE DES JETONS ===
+    // === IMAGE ===
     QLabel *leftImage = new QLabel;
-    QPixmap imgLeft("./Ressources/image/jetons.png");
-    if (!imgLeft.isNull())
-        leftImage->setPixmap(imgLeft.scaled(280, 280, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    leftImage->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+    QPixmap imgLeft("./Ressources/image/menu_principal.png");
+    if (!imgLeft.isNull()) {
+        leftImage->setPixmap(imgLeft.scaled(450, 450, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        // Rendre l'image arrondie
+        leftImage->setStyleSheet("border-radius: 20px; background-color: transparent;");
+        leftImage->setScaledContents(false);
+    }
+    leftImage->setAlignment(Qt::AlignCenter);
 
     // === TITRE CENTRÉ INDÉPENDANT ===
     QLabel *topTitle = new QLabel("PUISSANCE IV");
     topTitle->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
     topTitle->setStyleSheet("font-size: 80px; font-weight: bold; color: #1B3B5F;");
+
+    // === VERSION (coin supérieur droit) ===
+    QLabel *versionLabel = new QLabel("Version 1.0");
+    versionLabel->setAlignment(Qt::AlignRight | Qt::AlignTop);
+    versionLabel->setStyleSheet("font-size: 16px; color: #666666; padding: 5px 15px;");
 
     // === BOUTONS PRINCIPAUX ===
     QVBoxLayout *centerLayout = new QVBoxLayout;
@@ -142,18 +151,33 @@ void MainMenu::createMainMenu()
 
     // === HORIZONTAL ===
     QHBoxLayout *hLayout = new QHBoxLayout;
-    hLayout->setContentsMargins(120, 0, 100, 40);
-    hLayout->setSpacing(120);
-    hLayout->addWidget(leftImage, 0, Qt::AlignVCenter | Qt::AlignLeft);
-    hLayout->addLayout(centerLayout, 1);
-    hLayout->addStretch();
+    hLayout->setContentsMargins(100, 0, 100, 40);  // Marges égales gauche/droite
+    hLayout->setSpacing(80);
+    hLayout->addWidget(leftImage, 0, Qt::AlignCenter);  // Image centrée verticalement avec les boutons
+    hLayout->addLayout(centerLayout, 0);
+    hLayout->addSpacing(100);  // Espacement fixe à droite pour équilibrer
+
+    // === LAYOUT TITRE + VERSION ===
+    // Utiliser un layout horizontal avec stretches égaux pour centrer le titre parfaitement
+    QHBoxLayout *topLayout = new QHBoxLayout;
+    topLayout->setContentsMargins(20, 10, 20, 0);  // Petites marges, surtout en haut
+
+    // Ajouter une version "fantôme" invisible à gauche pour équilibrer
+    QLabel *spacerLeft = new QLabel;
+    spacerLeft->setFixedWidth(100);  // Même largeur que la version à droite
+
+    topLayout->addWidget(spacerLeft);
+    topLayout->addStretch(1);
+    topLayout->addWidget(topTitle, 0, Qt::AlignCenter);
+    topLayout->addStretch(1);
+    topLayout->addWidget(versionLabel, 0, Qt::AlignRight | Qt::AlignTop);  // AlignTop pour monter
 
     // === LAYOUT GLOBAL DU MENU ===
     QVBoxLayout *mainLayout = new QVBoxLayout(mainMenuWidget);
-    mainLayout->addWidget(topTitle, 0, Qt::AlignTop);
-    mainLayout->addSpacing(40);
+    mainLayout->addLayout(topLayout);
+    mainLayout->addSpacing(20);
     mainLayout->addLayout(hLayout, 1);
-    mainLayout->setContentsMargins(0, 40, 0, 40);
+    mainLayout->setContentsMargins(0, 20, 0, 40);  // Marge haute réduite
 
     // === Connexions ===
     connect(launchButton, &QPushButton::clicked, this, &MainMenu::showDifficultyMenu);
@@ -176,7 +200,7 @@ void MainMenu::createDifficultyMenu()
     layout->setContentsMargins(60, 30, 60, 30);
     layout->setSpacing(20);
 
-    backButtonDiff = new QPushButton("← Retour");
+    backButtonDiff = new QPushButton("Retour");
     backButtonDiff->setFixedSize(160, 55);
     backButtonDiff->setStyleSheet(
         "QPushButton { background-color: #E0E0E0; color: #1B3B5F;"
@@ -197,10 +221,9 @@ void MainMenu::createDifficultyMenu()
     diffEasy = new QPushButton("Facile");
     diffNormal = new QPushButton("Normal");
     diffHard = new QPushButton("Difficile");
-    diffImpossible = new QPushButton("Impossible");
 
-    QList<QPushButton*> diffButtons = {diffEasy, diffNormal, diffHard, diffImpossible};
-    QList<QString> colors = {"#2ECC71", "#E67E22", "#B22222", "#6B0F1A"};
+    QList<QPushButton*> diffButtons = {diffEasy, diffNormal, diffHard};
+    QList<QString> colors = {"#2ECC71", "#E67E22", "#B22222"};
 
     for (int i = 0; i < diffButtons.size(); ++i) {
         diffButtons[i]->setFixedSize(buttonWidth, buttonHeight);
@@ -233,7 +256,7 @@ void MainMenu::createColorMenu()
     layout->setContentsMargins(60, 30, 60, 30);
     layout->setSpacing(20);
 
-    backButtonColor = new QPushButton("← Retour");
+    backButtonColor = new QPushButton("Retour");
     backButtonColor->setFixedSize(160, 55);
     backButtonColor->setStyleSheet(
         "QPushButton { background-color: #E0E0E0; color: #1B3B5F;"
@@ -390,9 +413,7 @@ void MainMenu::onDifficultySelected()
     QPushButton *btn = qobject_cast<QPushButton*>(sender());
     if (!btn) return;
 
-    if (btn == diffImpossible)
-        selectedDifficulty = StateMachine::Difficulty::Impossible;
-    else if (btn == diffHard)
+    if (btn == diffHard)
         selectedDifficulty = StateMachine::Difficulty::Hard;
     else if (btn == diffNormal)
         selectedDifficulty = StateMachine::Difficulty::Medium;
@@ -421,7 +442,6 @@ void MainMenu::onColorSelected()
     case StateMachine::Difficulty::Easy: diffName = "Facile"; break;
     case StateMachine::Difficulty::Medium: diffName = "Normal"; break;
     case StateMachine::Difficulty::Hard: diffName = "Difficile"; break;
-    case StateMachine::Difficulty::Impossible: diffName = "Impossible"; break;
     }
 
     QString colorName = (selectedColor == StateMachine::PlayerColor::Red) ? "Rouge" : "Jaune";

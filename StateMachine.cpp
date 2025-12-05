@@ -44,14 +44,6 @@ void StateMachine::setDifficulty(Difficulty newDifficulty)
         Param3 = 2.5f;  // constante UCB
         std::cout << "Difficulté : Difficile (it=" << Param1 << ", sim=" << Param2 << ", ucb=" << Param3 << ")\n";
         break;
-
-    case Difficulty::Impossible:
-        // Version extrême, très longue
-        Param1 = 10000; // itérations
-        Param2 = 150;   // simulations
-        Param3 = 3.5f;  // UCB plus agressif
-        std::cout << "Difficulté : Impossible (it=" << Param1 << ", sim=" << Param2 << ", ucb=" << Param3 << ")\n";
-        break;
     }
 
     std::cout << "Difficulty changed to " << newDifficulty << std::endl;

@@ -97,7 +97,6 @@ int main(int argc, char *argv[])
     // StateMachine::Easy
     // StateMachine::Medium
     // StateMachine::Hard
-    // StateMachine::Impossible
 
     w.showGame();
     w.showFullScreen();

@@ -50,7 +50,7 @@ void GameScreen::createGameWidget()
     // ============================
     //  BOUTON QUITTER
     // ============================
-    quitButton = new QPushButton("← Quitter");
+    quitButton = new QPushButton("Quitter");
     quitButton->setFixedSize(160, 55);
     quitButton->setStyleSheet(
         "QPushButton { background-color: #E0E0E0; color: #1B3B5F;"
@@ -647,22 +647,33 @@ void GameScreen::updateCameraFrame(const QImage &img)
     }
 }
 
+void GameScreen::setPlayerColor(int color)
+{
+    playerColor = color;
+}
+
 void GameScreen::setTurnPlayer()
 {
+    // Couleur du joueur : rouge si playerColor=1, jaune si playerColor=2
+    QString color = (playerColor == 1) ? "#B22222" : "#EFCB00";
     turnLabel->setText("Au tour du joueur");
-    turnLabel->setStyleSheet("font-size: 35px; font-weight: bold; color: #B22222;");
+    turnLabel->setStyleSheet(QString("font-size: 35px; font-weight: bold; color: %1;").arg(color));
 }
 
 void GameScreen::setTurnRobot()
 {
+    // Couleur du robot : jaune si playerColor=1 (donc robot=2), rouge si playerColor=2 (donc robot=1)
+    QString color = (playerColor == 1) ? "#EFCB00" : "#B22222";
     turnLabel->setText("Au tour du robot");
-    turnLabel->setStyleSheet("font-size: 35px; font-weight: bold; color: #EFCB00;");
+    turnLabel->setStyleSheet(QString("font-size: 35px; font-weight: bold; color: %1;").arg(color));
 }
 
 void GameScreen::setRobotStatus(const QString &status)
 {
+    // Couleur du robot : jaune si playerColor=1 (donc robot=2), rouge si playerColor=2 (donc robot=1)
+    QString color = (playerColor == 1) ? "#EFCB00" : "#B22222";
     turnLabel->setText(QString("Au tour du robot : %1").arg(status));
-    turnLabel->setStyleSheet("font-size: 35px; font-weight: bold; color: #EFCB00;");
+    turnLabel->setStyleSheet(QString("font-size: 35px; font-weight: bold; color: %1;").arg(color));
 }
 
 void GameScreen::setDifficultyText(const QString &txt)

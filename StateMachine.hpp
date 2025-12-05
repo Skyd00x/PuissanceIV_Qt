@@ -18,8 +18,7 @@ public:
     enum Difficulty {
         Easy,
         Medium,
-        Hard,
-        Impossible
+        Hard
     };
 
     enum PlayerColor {

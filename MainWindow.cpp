@@ -248,6 +248,9 @@ void MainWindow::showExplanation()
 
 void MainWindow::showGame()
 {
+    // Définir la couleur du joueur dans GameScreen pour l'affichage des tours
+    gameScreen->setPlayerColor(stateMachine.getPlayerColorValue());
+
     stack->setCurrentWidget(gameScreen);
     gameScreen->startGame();
 }

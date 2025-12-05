@@ -19,6 +19,7 @@ public:
 
     void startGame();  // Lance le countdown et prépare le jeu
     void resetGame();  // Réinitialise complètement l'écran de jeu
+    void setPlayerColor(int color);  // Définit la couleur du joueur (1=rouge, 2=jaune)
 
     // Slots pour GameLogic
 public slots:
@@ -118,4 +119,7 @@ private:
     // Timer pour éviter d'afficher l'overlay de grille incomplète trop tôt
     QTimer gridWarningDelayTimer;
     bool allowGridWarning = false;
+
+    // Couleur du joueur (1=rouge, 2=jaune)
+    int playerColor = 1;  // Par défaut rouge
 };

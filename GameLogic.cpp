@@ -150,7 +150,6 @@ void GameLogic::startGame()
     case StateMachine::Easy: diffString = "Facile"; break;
     case StateMachine::Medium: diffString = "Normal"; break;
     case StateMachine::Hard: diffString = "Difficile"; break;
-    case StateMachine::Impossible: diffString = "Impossible"; break;
     }
     emit difficultyText(diffString);
 
@@ -381,7 +380,6 @@ void GameLogic::onGridUpdated(const QVector<QVector<int>>& g)
             case StateMachine::Easy: diffString = "Facile"; break;
             case StateMachine::Medium: diffString = "Normal"; break;
             case StateMachine::Hard: diffString = "Difficile"; break;
-            case StateMachine::Impossible: diffString = "Impossible"; break;
             }
             emit gameResult("Joueur", diffString, elapsedSeconds);
             gameRunning = false;
@@ -395,7 +393,6 @@ void GameLogic::onGridUpdated(const QVector<QVector<int>>& g)
             case StateMachine::Easy: diffString = "Facile"; break;
             case StateMachine::Medium: diffString = "Normal"; break;
             case StateMachine::Hard: diffString = "Difficile"; break;
-            case StateMachine::Impossible: diffString = "Impossible"; break;
             }
             emit gameResult("Robot", diffString, elapsedSeconds);
             gameRunning = false;
@@ -409,7 +406,6 @@ void GameLogic::onGridUpdated(const QVector<QVector<int>>& g)
             case StateMachine::Easy: diffString = "Facile"; break;
             case StateMachine::Medium: diffString = "Normal"; break;
             case StateMachine::Hard: diffString = "Difficile"; break;
-            case StateMachine::Impossible: diffString = "Impossible"; break;
             }
             emit gameResult("Égalité", diffString, elapsedSeconds);
             gameRunning = false;
@@ -482,8 +478,7 @@ void GameLogic::launchRobotTurn()
     switch (sm->getDifficulty()) {
     case StateMachine::Easy: depth = 3; break;
     case StateMachine::Medium: depth = 5; break;
-    case StateMachine::Hard: depth = 7; break;
-    case StateMachine::Impossible: depth = 10; break;
+    case StateMachine::Hard: depth = 6; break;
     }
 
     qDebug() << "[GameLogic] Lancement du thread negamax avec profondeur=" << depth;
@@ -552,7 +547,7 @@ void GameLogic::runNegamax(int depth)
             bestMove = validColumns[randomIndex];
             qDebug() << "[GameLogic] *** MODE FACILE *** Colonne aléatoire choisie :" << bestMove << "(index" << randomIndex << "sur" << validColumns.size() << "colonnes)";
         } else {
-            // Modes Normal, Difficile, Impossible : utiliser Negamax
+            // Modes Normal et Difficile : utiliser Negamax
             qDebug() << "[GameLogic] IA réfléchit avec Negamax...";
             emit robotStatus("Il réfléchit");
             QVector<QVector<int>> current = grid;

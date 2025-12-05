@@ -64,7 +64,6 @@ private:
     QPushButton *diffEasy;
     QPushButton *diffNormal;
     QPushButton *diffHard;
-    QPushButton *diffImpossible;
     QPushButton *backButtonDiff;
 
     // Choix de couleur

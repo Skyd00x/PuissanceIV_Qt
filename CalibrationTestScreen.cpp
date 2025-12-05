@@ -74,7 +74,7 @@ CalibrationTestScreen::CalibrationTestScreen(Robot *robot, CalibrationLogic* cal
     // === BOUTONS ===
     startButton = new QPushButton("Lancer le test");
     stopButton = new QPushButton("Arrêter le test");
-    backButton = new QPushButton("← Retour au menu");
+    backButton = new QPushButton("Retour au menu");
 
     stopButton->hide();
 

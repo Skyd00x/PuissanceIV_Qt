@@ -257,7 +257,7 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
     }
 
     // === BOUTON QUITTER ===
-    quitButton = new QPushButton("← Quitter", mainWidget);
+    quitButton = new QPushButton("Quitter", mainWidget);
     quitButton->setFixedSize(160, 55);
     quitButton->setStyleSheet(
         "QPushButton { background-color: #E0E0E0; color: #1B3B5F;"
