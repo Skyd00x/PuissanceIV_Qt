@@ -7,8 +7,9 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
-    setWindowTitle("Puissance IV Robotisé");
+    setWindowTitle("Puissance IV");
     setMinimumSize(1280, 720);
+    setWindowIcon(QIcon("./Ressources/image/icon.png"));
 
     // === STACK PRINCIPAL ===
     stack = new QStackedWidget(this);

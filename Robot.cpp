@@ -148,12 +148,12 @@ void Robot::setPrecisionSpeed()
 // ============================================================================
 //  Position Home
 // ============================================================================
-void Robot::Home()
+bool Robot::Home()
 {
     // Vérifier le flag d'arrêt d'urgence AVANT de verrouiller le mutex
     if (emergencyStopFlag) {
-        qDebug() << "[Robot] ⚠️ Home() annulé : arrêt d'urgence activé";
-        return;
+        qWarning() << "[Robot] ❌ Home() annulé : arrêt d'urgence activé";
+        return false;
     }
 
     qDebug() << "[Robot] 🔒 Home() - Tentative de verrouillage du mutex...";
@@ -162,8 +162,8 @@ void Robot::Home()
 
     // Vérifier à nouveau après avoir obtenu le mutex
     if (emergencyStopFlag) {
-        qDebug() << "[Robot] ⚠️ Home() annulé : arrêt d'urgence activé (après mutex)";
-        return;
+        qWarning() << "[Robot] ❌ Home() annulé : arrêt d'urgence activé (après mutex)";
+        return false;
     }
 
     // ÉTAPE 0 : FORCER L'ARRÊT de toute commande en cours pour éviter les conflits
@@ -174,21 +174,34 @@ void Robot::Home()
 
     // ÉTAPE 0.5 : Cycle ouverture/fermeture de la pince et coupure du compresseur avant de remonter
     qDebug() << "[Robot] Ouverture de la pince avant fermeture...";
-    openGripper();
+    if (!openGripper()) {
+        qWarning() << "[Robot] ❌ Home() ÉCHEC : impossible d'ouvrir la pince";
+        return false;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(300)); // Laisser le temps à la pince de s'ouvrir
 
     qDebug() << "[Robot] Fermeture de la pince avant Home...";
-    closeGripper();
+    if (!closeGripper()) {
+        qWarning() << "[Robot] ❌ Home() ÉCHEC : impossible de fermer la pince";
+        return false;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Laisser le temps à la pince de se fermer
 
     qDebug() << "[Robot] Coupure du compresseur...";
-    turnOffGripper();
+    if (!turnOffGripper()) {
+        qWarning() << "[Robot] ❌ Home() ÉCHEC : impossible de couper le compresseur";
+        return false;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(200)); // Laisser le temps au compresseur de se couper
 
     // ÉTAPE 1 : Monter à la hauteur de sécurité (Z de la grille = 104.0f)
     qDebug() << "[Robot] Récupération de la position actuelle...";
     Pose current;
-    GetPose(&current);
+    int result = GetPose(&current);
+    if (result != DobotCommunicate_NoError) {
+        qWarning() << "[Robot] ❌ Home() ÉCHEC : GetPose a retourné une erreur";
+        return false;
+    }
     qDebug() << "[Robot] Position actuelle : X=" << current.x << " Y=" << current.y << " Z=" << current.z << " R=" << current.r;
 
     // Créer une nouvelle position avec le Z du point générique de la grille (104.0f)
@@ -212,7 +225,10 @@ void Robot::Home()
 
     uint64_t safeIdx = 0;
     SetPTPCmd(&cmd, true, &safeIdx);
-    waitForCompletion(safeIdx);
+    if (!waitForCompletion(safeIdx)) {
+        qWarning() << "[Robot] ❌ Home() ÉCHEC : timeout lors de la montée à la position de sécurité";
+        return false;
+    }
     qDebug() << "[Robot] Position de sécurité atteinte";
 
     // ÉTAPE 2 : Retour à la position Home
@@ -227,7 +243,10 @@ void Robot::Home()
     SetHOMECmd(&homeCmd, true, &idx);
 
     qDebug() << "[Robot] Attente de la fin du mouvement Home (idx=" << idx << ") avec timeout de 60s...";
-    waitForCompletion(idx, 60);  // Timeout de 60 secondes pour Home
+    if (!waitForCompletion(idx, 60)) {  // Timeout de 60 secondes pour Home
+        qWarning() << "[Robot] ❌ Home() ÉCHEC : timeout lors du mouvement Home";
+        return false;
+    }
 
     // CRITIQUE : Attente supplémentaire pour garantir que le mouvement physique est VRAIMENT terminé
     // La commande HOME peut prendre plusieurs secondes, on attend que la queue soit complètement vide
@@ -241,19 +260,20 @@ void Robot::Home()
     // Attendre un peu de plus pour que le robot se stabilise physiquement
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-    qDebug() << "[Robot] ==== FIN Home() ==== (Mouvement physique terminé, Mutex déverrouillé)";
+    qDebug() << "[Robot] ✅ ==== FIN Home() ==== (Mouvement physique terminé avec succès, Mutex déverrouillé)";
     // Le mutex sera automatiquement déverrouillé à la sortie de la fonction (QMutexLocker)
+    return true;
 }
 
 // ============================================================================
 //  Déplacements
 // ============================================================================
-void Robot::goTo(Pose p, bool precise)
+bool Robot::goTo(Pose p, bool precise)
 {
     // Vérifier le flag d'arrêt d'urgence AVANT de verrouiller le mutex
     if (emergencyStopFlag) {
-        qDebug() << "[Robot] ⚠️ goTo() annulé : arrêt d'urgence activé";
-        return;
+        qWarning() << "[Robot] ❌ goTo() annulé : arrêt d'urgence activé";
+        return false;
     }
 
     QMutexLocker locker(&robotMutex);  // Verrouille le mutex
@@ -261,8 +281,8 @@ void Robot::goTo(Pose p, bool precise)
 
     // Vérifier à nouveau après avoir obtenu le mutex
     if (emergencyStopFlag) {
-        qDebug() << "[Robot] ⚠️ goTo() annulé : arrêt d'urgence activé (après mutex)";
-        return;
+        qWarning() << "[Robot] ❌ goTo() annulé : arrêt d'urgence activé (après mutex)";
+        return false;
     }
 
     // Clear les alarmes avant le mouvement pour éviter les blocages
@@ -282,7 +302,14 @@ void Robot::goTo(Pose p, bool precise)
 
     uint64_t idx = 0;
     SetPTPCmd(&cmd, false, &idx);
-    waitForCompletion(idx);
+    if (!waitForCompletion(idx)) {
+        qWarning() << "[Robot] ❌ goTo() ÉCHEC : timeout lors du mouvement";
+        // Revenir à la vitesse normale même en cas d'échec
+        if (precise) {
+            setNormalSpeed();
+        }
+        return false;
+    }
 
     // Revenir à la vitesse normale après le mouvement de précision
     if (precise) {
@@ -290,14 +317,15 @@ void Robot::goTo(Pose p, bool precise)
     }
 
     qDebug() << "[Robot] goTo() - Mutex déverrouillé";
+    return true;
 }
 
-void Robot::goToSecurized(Pose target, float safeZ)
+bool Robot::goToSecurized(Pose target, float safeZ)
 {
     // Vérifier le flag d'arrêt d'urgence AVANT de verrouiller le mutex
     if (emergencyStopFlag) {
-        qDebug() << "[Robot] ⚠️ goToSecurized() annulé : arrêt d'urgence activé";
-        return;
+        qWarning() << "[Robot] ❌ goToSecurized() annulé : arrêt d'urgence activé";
+        return false;
     }
 
     qDebug() << "[Robot] 🔒 goToSecurized() - Tentative de verrouillage du mutex...";
@@ -306,8 +334,8 @@ void Robot::goToSecurized(Pose target, float safeZ)
 
     // Vérifier à nouveau après avoir obtenu le mutex
     if (emergencyStopFlag) {
-        qDebug() << "[Robot] ⚠️ goToSecurized() annulé : arrêt d'urgence activé (après mutex)";
-        return;
+        qWarning() << "[Robot] ❌ goToSecurized() annulé : arrêt d'urgence activé (après mutex)";
+        return false;
     }
 
     // === SYSTÈME DE POINTS DE PASSAGE POUR ÉVITER LES COLLISIONS ===
@@ -318,30 +346,40 @@ void Robot::goToSecurized(Pose target, float safeZ)
 
     // Récupère la pose actuelle
     Pose current;
-    GetPose(&current);
+    int result = GetPose(&current);
+    if (result != DobotCommunicate_NoError) {
+        qWarning() << "[Robot] ❌ goToSecurized() ÉCHEC : GetPose a retourné une erreur";
+        return false;
+    }
 
     // Étape 1 : Monter à safeZ avec la position actuelle (x, y) - vitesse normale
     qDebug() << "[Robot] Étape 1/4 : Montée à z=" << safeZ << " (sécurité)";
     Pose stepUp = current;
     stepUp.z = safeZ;
-    goTo(stepUp, false);  // Vitesse normale
+    if (!goTo(stepUp, false)) {  // Vitesse normale
+        qWarning() << "[Robot] ❌ goToSecurized() ÉCHEC : étape 1 a échoué";
+        return false;
+    }
 
     // Vérifier le flag après chaque étape
     if (emergencyStopFlag) {
-        qDebug() << "[Robot] ⚠️ goToSecurized() annulé après étape 1 : arrêt d'urgence activé";
-        return;
+        qWarning() << "[Robot] ❌ goToSecurized() annulé après étape 1 : arrêt d'urgence activé";
+        return false;
     }
 
     // Étape 2 : Se déplacer horizontalement au-dessus de la cible à safeZ - vitesse normale
     qDebug() << "[Robot] Étape 2/4 : Déplacement horizontal vers (x=" << target.x << ", y=" << target.y << ", z=" << safeZ << ")";
     Pose stepOver = target;
     stepOver.z = safeZ;
-    goTo(stepOver, false);  // Vitesse normale
+    if (!goTo(stepOver, false)) {  // Vitesse normale
+        qWarning() << "[Robot] ❌ goToSecurized() ÉCHEC : étape 2 a échoué";
+        return false;
+    }
 
     // Vérifier le flag après chaque étape
     if (emergencyStopFlag) {
-        qDebug() << "[Robot] ⚠️ goToSecurized() annulé après étape 2 : arrêt d'urgence activé";
-        return;
+        qWarning() << "[Robot] ❌ goToSecurized() annulé après étape 2 : arrêt d'urgence activé";
+        return false;
     }
 
     // Étape 3 : Descendre RAPIDEMENT jusqu'à 15mm au-dessus de la cible
@@ -349,27 +387,34 @@ void Robot::goToSecurized(Pose target, float safeZ)
     qDebug() << "[Robot] Étape 3/4 : Descente RAPIDE jusqu'à z=" << (target.z + approachDistance);
     Pose stepApproach = target;
     stepApproach.z = target.z + approachDistance;
-    goTo(stepApproach, false);  // Vitesse normale
+    if (!goTo(stepApproach, false)) {  // Vitesse normale
+        qWarning() << "[Robot] ❌ goToSecurized() ÉCHEC : étape 3 a échoué";
+        return false;
+    }
 
     // Vérifier le flag après chaque étape
     if (emergencyStopFlag) {
-        qDebug() << "[Robot] ⚠️ goToSecurized() annulé après étape 3 : arrêt d'urgence activé";
-        return;
+        qWarning() << "[Robot] ❌ goToSecurized() annulé après étape 3 : arrêt d'urgence activé";
+        return false;
     }
 
     // Étape 4 : Descendre LENTEMENT les derniers millimètres pour la précision
     qDebug() << "[Robot] Étape 4/4 : Descente PRÉCISE finale à z=" << target.z;
-    goTo(target, true);  // VITESSE RÉDUITE pour la précision
+    if (!goTo(target, true)) {  // VITESSE RÉDUITE pour la précision
+        qWarning() << "[Robot] ❌ goToSecurized() ÉCHEC : étape 4 a échoué";
+        return false;
+    }
 
-    qDebug() << "[Robot] Déplacement sécurisé terminé - Mutex déverrouillé";
+    qDebug() << "[Robot] ✅ Déplacement sécurisé terminé avec succès - Mutex déverrouillé";
+    return true;
 }
 
-void Robot::rotate(float delta)
+bool Robot::rotate(float delta)
 {
     // Vérifier le flag d'arrêt d'urgence AVANT de verrouiller le mutex
     if (emergencyStopFlag) {
-        qDebug() << "[Robot] ⚠️ rotate() annulé : arrêt d'urgence activé";
-        return;
+        qWarning() << "[Robot] ❌ rotate() annulé : arrêt d'urgence activé";
+        return false;
     }
 
     QMutexLocker locker(&robotMutex);  // Verrouille le mutex
@@ -377,8 +422,8 @@ void Robot::rotate(float delta)
 
     // Vérifier à nouveau après avoir obtenu le mutex
     if (emergencyStopFlag) {
-        qDebug() << "[Robot] ⚠️ rotate() annulé : arrêt d'urgence activé (après mutex)";
-        return;
+        qWarning() << "[Robot] ❌ rotate() annulé : arrêt d'urgence activé (après mutex)";
+        return false;
     }
 
     // Clear les alarmes avant le mouvement
@@ -386,7 +431,11 @@ void Robot::rotate(float delta)
 
     // Récupère la pose actuelle
     Pose p;
-    GetPose(&p);
+    int result = GetPose(&p);
+    if (result != DobotCommunicate_NoError) {
+        qWarning() << "[Robot] ❌ rotate() ÉCHEC : GetPose a retourné une erreur";
+        return false;
+    }
 
     // Clamp de la rotation
     p.r = std::clamp(p.r + delta, -100.0f, 100.0f);
@@ -406,17 +455,21 @@ void Robot::rotate(float delta)
     SetQueuedCmdStartExec();
     SetPTPCmd(&cmd, true, &idx);
 
-    waitForCompletion(idx);
+    if (!waitForCompletion(idx)) {
+        qWarning() << "[Robot] ❌ rotate() ÉCHEC : timeout lors de la rotation";
+        return false;
+    }
 
     qDebug() << "[Robot] rotate() - Mutex déverrouillé";
+    return true;
 }
 
-void Robot::moveAxis(char axis, float delta)
+bool Robot::moveAxis(char axis, float delta)
 {
     // Vérifier le flag d'arrêt d'urgence AVANT de verrouiller le mutex
     if (emergencyStopFlag) {
-        qDebug() << "[Robot] ⚠️ moveAxis() annulé : arrêt d'urgence activé";
-        return;
+        qWarning() << "[Robot] ❌ moveAxis() annulé : arrêt d'urgence activé";
+        return false;
     }
 
     QMutexLocker locker(&robotMutex);  // Verrouille le mutex
@@ -424,8 +477,8 @@ void Robot::moveAxis(char axis, float delta)
 
     // Vérifier à nouveau après avoir obtenu le mutex
     if (emergencyStopFlag) {
-        qDebug() << "[Robot] ⚠️ moveAxis() annulé : arrêt d'urgence activé (après mutex)";
-        return;
+        qWarning() << "[Robot] ❌ moveAxis() annulé : arrêt d'urgence activé (après mutex)";
+        return false;
     }
 
     // Clear les alarmes avant le mouvement
@@ -433,7 +486,11 @@ void Robot::moveAxis(char axis, float delta)
 
     // Récupère la pose actuelle
     Pose p;
-    GetPose(&p);
+    int result = GetPose(&p);
+    if (result != DobotCommunicate_NoError) {
+        qWarning() << "[Robot] ❌ moveAxis() ÉCHEC : GetPose a retourné une erreur";
+        return false;
+    }
 
     // Applique le delta sur l'axe spécifié
     switch (axis) {
@@ -453,8 +510,8 @@ void Robot::moveAxis(char axis, float delta)
             qDebug() << "[Robot] Déplacement Z de" << delta << "mm -> nouvelle position Z =" << p.z;
             break;
         default:
-            qWarning() << "[Robot] Axe invalide:" << axis;
-            return;
+            qWarning() << "[Robot] ❌ Axe invalide:" << axis;
+            return false;
     }
 
     // Envoie de la commande
@@ -472,9 +529,13 @@ void Robot::moveAxis(char axis, float delta)
     SetQueuedCmdStartExec();
     SetPTPCmd(&cmd, true, &idx);
 
-    waitForCompletion(idx);
+    if (!waitForCompletion(idx)) {
+        qWarning() << "[Robot] ❌ moveAxis() ÉCHEC : timeout lors du déplacement";
+        return false;
+    }
 
     qDebug() << "[Robot] moveAxis() - Mutex déverrouillé";
+    return true;
 }
 
 uint64_t Robot::moveAxisContinuous(char axis, float delta)
@@ -543,16 +604,16 @@ bool Robot::isCommandCompleted(uint64_t commandIndex)
 // ============================================================================
 //  Gripper
 // ============================================================================
-void Robot::openGripper()    { gripper(true, false); }
-void Robot::closeGripper()   { gripper(true, true); }
-void Robot::turnOffGripper() { gripper(false, false); }
+bool Robot::openGripper()    { return gripper(true, false); }
+bool Robot::closeGripper()   { return gripper(true, true); }
+bool Robot::turnOffGripper() { return gripper(false, false); }
 
-void Robot::gripper(bool enable, bool grip)
+bool Robot::gripper(bool enable, bool grip)
 {
     // Vérifier le flag d'arrêt d'urgence AVANT de verrouiller le mutex
     if (emergencyStopFlag) {
-        qDebug() << "[Robot] ⚠️ gripper() annulé : arrêt d'urgence activé";
-        return;
+        qWarning() << "[Robot] ❌ gripper() annulé : arrêt d'urgence activé";
+        return false;
     }
 
     qDebug() << "[Robot] 🔒 gripper() - Tentative de verrouillage du mutex...";
@@ -561,8 +622,8 @@ void Robot::gripper(bool enable, bool grip)
 
     // Vérifier à nouveau après avoir obtenu le mutex
     if (emergencyStopFlag) {
-        qDebug() << "[Robot] ⚠️ gripper() annulé : arrêt d'urgence activé (après mutex)";
-        return;
+        qWarning() << "[Robot] ❌ gripper() annulé : arrêt d'urgence activé (après mutex)";
+        return false;
     }
 
     uint64_t idx = 0;
@@ -571,15 +632,19 @@ void Robot::gripper(bool enable, bool grip)
     SetQueuedCmdStartExec();
     SetEndEffectorGripper(enable, grip, true, &idx);
 
-    waitForCompletion(idx);
+    if (!waitForCompletion(idx)) {
+        qWarning() << "[Robot] ❌ gripper() ÉCHEC : timeout lors du contrôle de la pince";
+        return false;
+    }
 
     qDebug() << "[Robot] gripper() - Mutex déverrouillé";
+    return true;
 }
 
 // ============================================================================
 //  Attente de fin d'exécution (avec timeout et détection de blocage)
 // ============================================================================
-void Robot::waitForCompletion(uint64_t targetIndex, int timeoutSeconds)
+bool Robot::waitForCompletion(uint64_t targetIndex, int timeoutSeconds)
 {
     const int TIMEOUT_SECONDS = timeoutSeconds;  // Timeout configurable (5s par défaut, 60s pour Home)
     const int STUCK_THRESHOLD = timeoutSeconds * 20;  // Seuil de blocage = timeout (en x50ms)
@@ -595,16 +660,21 @@ void Robot::waitForCompletion(uint64_t targetIndex, int timeoutSeconds)
     {
         // Vérifier le flag d'arrêt d'urgence à chaque itération
         if (emergencyStopFlag) {
-            qDebug() << "[Robot] ⚠️ waitForCompletion() interrompu : arrêt d'urgence activé";
-            return;
+            qWarning() << "[Robot] ❌ waitForCompletion() ÉCHEC : arrêt d'urgence activé";
+            return false;
         }
 
-        GetQueuedCmdCurrentIndex(&currentIndex);
+        // Vérifier le retour de GetQueuedCmdCurrentIndex
+        int result = GetQueuedCmdCurrentIndex(&currentIndex);
+        if (result != DobotCommunicate_NoError) {
+            qWarning() << "[Robot] ❌ waitForCompletion() ÉCHEC : GetQueuedCmdCurrentIndex a retourné une erreur";
+            return false;
+        }
 
         // Succès : l'index a atteint ou dépassé la commande visée
         if (currentIndex >= targetIndex) {
             qDebug() << "[Robot] ✅ Commande terminée (currentIndex=" << currentIndex << ", target=" << targetIndex << ")";
-            return;
+            return true;
         }
 
         // Détection de blocage : l'index ne progresse plus
@@ -631,11 +701,11 @@ void Robot::waitForCompletion(uint64_t targetIndex, int timeoutSeconds)
         ).count();
 
         if (elapsed > TIMEOUT_SECONDS) {
-            qWarning() << "[Robot] ⏱️ TIMEOUT : La commande n'a pas terminé après " << TIMEOUT_SECONDS << "s";
+            qWarning() << "[Robot] ❌ TIMEOUT : La commande n'a pas terminé après " << TIMEOUT_SECONDS << "s";
             qWarning() << "[Robot] currentIndex=" << currentIndex << ", targetIndex=" << targetIndex;
             qWarning() << "[Robot] Clearing des alarmes...";
             ClearAllAlarmsState();
-            return;
+            return false;
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(50));

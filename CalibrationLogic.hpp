@@ -98,10 +98,12 @@ public:
 
     // === Fonctions de haut niveau pour manipuler les pions ===
     // Prendre un pion à une position de réservoir (Left_1..Left_4 ou Right_1..Right_4)
-    void pickPiece(CalibPoint reservoirPosition);
+    // Retourne false en cas d'échec
+    bool pickPiece(CalibPoint reservoirPosition);
 
     // Lâcher un pion dans une colonne de la grille (0..6)
-    void dropPiece(int column);
+    // Retourne false en cas d'échec
+    bool dropPiece(int column);
 
 signals:
     void connectionFinished(bool success);

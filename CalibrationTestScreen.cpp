@@ -299,11 +299,21 @@ void CalibrationTestScreen::runTest() {
     }, Qt::QueuedConnection);
 
     // Remise à la position d'origine
-    robot->Home();
+    if (!robot->Home()) {
+        qWarning() << "[CalibrationTestScreen] ❌ ERREUR : Échec de Home()";
+        QMetaObject::invokeMethod(this, [this]() {
+            statusLabel->setText("ERREUR : Échec du retour à la position initiale");
+            statusLabel->setStyleSheet("font-size: 24px; color: red; font-weight: bold; padding: 15px;");
+        }, Qt::QueuedConnection);
+        calib->disconnectToRobot();
+        QMetaObject::invokeMethod(this, [this]() { resetScreen(); }, Qt::QueuedConnection);
+        testRunning = false;
+        return;
+    }
     std::this_thread::sleep_for(std::chrono::seconds(2));
 
     if (shouldStop) {
-        qDebug() << "[CalibrationTestScreen] Arrêt demandé pendant Home()";
+        qDebug() << "[CalibrationTestScreen] Arrêt demandé après Home()";
         calib->disconnectToRobot();
         QMetaObject::invokeMethod(this, [this]() { resetScreen(); }, Qt::QueuedConnection);
         testRunning = false;

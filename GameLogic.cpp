@@ -104,7 +104,14 @@ void GameLogic::prepareGame()
             // Remise en position initiale DIRECTEMENT via robot->Home()
             qDebug() << "[GameLogic] === REMISE EN POSITION INITIALE ===";
             qDebug() << "[GameLogic] ⚠️ APPEL UNIQUE À robot->Home() depuis GameLogic::prepareGame() thread";
-            robot->Home();
+            if (!robot->Home()) {
+                qWarning() << "[GameLogic] ❌ ERREUR : Échec de Home() - le robot n'a pas pu retourner à sa position initiale";
+                QMetaObject::invokeMethod(this, [this]() {
+                    emit robotStatus("ERREUR : Échec du retour à la position initiale");
+                }, Qt::QueuedConnection);
+                preparationRunning = false;
+                return;
+            }
             qDebug() << "[GameLogic] ✅ robot->Home() TERMINÉ depuis GameLogic::prepareGame() thread";
 
             // Vérifier si l'arrêt d'urgence a été activé pendant le Home
@@ -116,9 +123,19 @@ void GameLogic::prepareGame()
 
             // Fermer la pince pour être prêt à jouer
             qDebug() << "[GameLogic] Fermeture de la pince...";
-            robot->closeGripper();
+            if (!robot->closeGripper()) {
+                qWarning() << "[GameLogic] ❌ ERREUR : Échec de closeGripper()";
+                QMetaObject::invokeMethod(this, [this]() {
+                    emit robotStatus("ERREUR : Impossible de fermer la pince");
+                }, Qt::QueuedConnection);
+                preparationRunning = false;
+                return;
+            }
             std::this_thread::sleep_for(std::chrono::milliseconds(300));
-            robot->turnOffGripper();
+            if (!robot->turnOffGripper()) {
+                qWarning() << "[GameLogic] ❌ ERREUR : Échec de turnOffGripper()";
+                // On continue quand même car ce n'est pas critique
+            }
 
             // Vérifier si l'arrêt d'urgence a été activé
             if (!preparationRunning) {
@@ -228,11 +245,17 @@ void GameLogic::stopGame()
     // Ouvrir puis fermer la pince pour lâcher tout pion éventuel
     if (robot && robotConnected) {
         qDebug() << "[GameLogic] Ouverture et fermeture de la pince...";
-        robot->openGripper();
+        if (!robot->openGripper()) {
+            qWarning() << "[GameLogic] ⚠️ Échec d'ouverture de la pince lors de l'arrêt";
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
-        robot->closeGripper();
+        if (!robot->closeGripper()) {
+            qWarning() << "[GameLogic] ⚠️ Échec de fermeture de la pince lors de l'arrêt";
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
-        robot->turnOffGripper();  // Couper le compresseur
+        if (!robot->turnOffGripper()) {
+            qWarning() << "[GameLogic] ⚠️ Échec de coupure du compresseur lors de l'arrêt";
+        }
     }
 
     // Déconnecter le robot pour permettre une nouvelle connexion propre à la prochaine partie
@@ -670,7 +693,12 @@ void GameLogic::runNegamax(int depth)
         emit robotStatus("Récupère le pion");
 
         // Prendre le pion dans le réservoir (fonction de haut niveau qui gère tout)
-        calib->pickPiece(pickPos);
+        if (!calib->pickPiece(pickPos)) {
+            qWarning() << "[GameLogic] ❌ ERREUR : Échec de pickPiece() - le robot n'a pas pu récupérer le pion";
+            emit robotStatus("ERREUR : Impossible de récupérer le pion");
+            negamaxRunning = false;
+            return;
+        }
         qDebug() << "[GameLogic] Pion récupéré";
 
         // Vérifier après chaque opération robot
@@ -683,7 +711,12 @@ void GameLogic::runNegamax(int depth)
         qDebug() << "[GameLogic] Place le pion dans la colonne" << bestMove;
         emit robotStatus(QString("Place le pion dans la colonne %1").arg(bestMove+1));
         // Lâcher le pion dans la colonne choisie (fonction de haut niveau)
-        calib->dropPiece(bestMove);
+        if (!calib->dropPiece(bestMove)) {
+            qWarning() << "[GameLogic] ❌ ERREUR : Échec de dropPiece() - le robot n'a pas pu placer le pion";
+            emit robotStatus("ERREUR : Impossible de placer le pion");
+            negamaxRunning = false;
+            return;
+        }
         qDebug() << "[GameLogic] Pion placé";
 
         // Vérifier après chaque opération robot

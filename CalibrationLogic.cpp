@@ -113,7 +113,10 @@ void CalibrationLogic::homeRobot() {
     if (!connected || !robot) return;
 
     std::thread([this]() {
-        robot->Home();
+        if (!robot->Home()) {
+            qWarning() << "[CalibrationLogic] ❌ ERREUR : Échec de Home()";
+            return;
+        }
 
         // Vérifier si on doit arrêter avant d'émettre le signal
         if (!shouldStop_) {
@@ -325,7 +328,10 @@ void CalibrationLogic::testCalibration() {
                 return;
             }
 
-            robot->goToSecurized(calibratedPoints[i], safeZ);
+            if (!robot->goToSecurized(calibratedPoints[i], safeZ)) {
+                qWarning() << "[CalibrationLogic] ❌ ERREUR : Test de calibration échoué au point" << i;
+                return;
+            }
 
             int progress = (i + 1) * 100 / total;
             if (!shouldStop_) {
@@ -443,7 +449,9 @@ void CalibrationLogic::goToLeftReservoirArea() {
     float gridZ = gridGeneric.z;
 
     qDebug() << "[CalibrationLogic] Déplacement vers réservoir gauche avec hauteur grille z=" << gridZ;
-    robot->goToSecurized(target, gridZ);
+    if (!robot->goToSecurized(target, gridZ)) {
+        qWarning() << "[CalibrationLogic] ❌ ERREUR : Impossible d'atteindre le réservoir gauche";
+    }
 }
 
 void CalibrationLogic::goToRightReservoirArea() {
@@ -462,7 +470,9 @@ void CalibrationLogic::goToRightReservoirArea() {
     float gridZ = gridGeneric.z;
 
     qDebug() << "[CalibrationLogic] Déplacement vers réservoir droit avec hauteur grille z=" << gridZ;
-    robot->goToSecurized(target, gridZ);
+    if (!robot->goToSecurized(target, gridZ)) {
+        qWarning() << "[CalibrationLogic] ❌ ERREUR : Impossible d'atteindre le réservoir droit";
+    }
 }
 
 void CalibrationLogic::goToGridArea() {
@@ -475,7 +485,9 @@ void CalibrationLogic::goToGridArea() {
 
     // Utiliser le Z du point générique de la grille comme hauteur de sécurité
     float gridZ = target.z;
-    robot->goToSecurized(target, gridZ);
+    if (!robot->goToSecurized(target, gridZ)) {
+        qWarning() << "[CalibrationLogic] ❌ ERREUR : Impossible d'atteindre la grille";
+    }
 }
 
 // === Sauvegarde ===
@@ -632,8 +644,11 @@ Pose CalibrationLogic::getReservoirGenericPoint(bool isLeftReservoir) const {
 //   Fonctions de haut niveau pour manipuler les pions
 // =====================================================
 
-void CalibrationLogic::pickPiece(CalibPoint reservoirPosition) {
-    if (!connected || !robot) return;
+bool CalibrationLogic::pickPiece(CalibPoint reservoirPosition) {
+    if (!connected || !robot) {
+        qWarning() << "[CalibrationLogic] ❌ pickPiece() ÉCHEC : robot non connecté";
+        return false;
+    }
 
     // Vérifier que la position est bien dans un réservoir
     int posIndex = (int)reservoirPosition;
@@ -641,12 +656,15 @@ void CalibrationLogic::pickPiece(CalibPoint reservoirPosition) {
     bool isRightReservoir = (posIndex >= (int)CalibPoint::Right_1 && posIndex <= (int)CalibPoint::Right_4);
 
     if (!isLeftReservoir && !isRightReservoir) {
-        qDebug() << "[CalibrationLogic] ERREUR: pickPiece() requiert une position de réservoir (Left_1..4 ou Right_1..4)";
-        return;
+        qWarning() << "[CalibrationLogic] ❌ pickPiece() ÉCHEC : position invalide (doit être Left_1..4 ou Right_1..4)";
+        return false;
     }
 
     // IMPORTANT: Ouvrir la pince AVANT de descendre sur le pion
-    robot->openGripper();
+    if (!robot->openGripper()) {
+        qWarning() << "[CalibrationLogic] ❌ pickPiece() ÉCHEC : impossible d'ouvrir la pince";
+        return false;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
     // Récupérer la position calibrée
@@ -654,30 +672,49 @@ void CalibrationLogic::pickPiece(CalibPoint reservoirPosition) {
 
     // Aller chercher le pion de manière sécurisée avec hauteur calculée
     float safeZ = getSafeHeight();
-    robot->goToSecurized(pickPose, safeZ);
+    if (!robot->goToSecurized(pickPose, safeZ)) {
+        qWarning() << "[CalibrationLogic] ❌ pickPiece() ÉCHEC : impossible d'atteindre la position du pion";
+        return false;
+    }
 
     // Fermer la pince pour attraper le pion
-    robot->closeGripper();
+    if (!robot->closeGripper()) {
+        qWarning() << "[CalibrationLogic] ❌ pickPiece() ÉCHEC : impossible de fermer la pince";
+        return false;
+    }
 
     // Petite pause pour s'assurer que le pion est bien attrapé
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
     // IMPORTANT: Remonter doucement de 30mm sur Z pour extraire le pion de l'emplacement
     Pose currentPose;
-    GetPose(&currentPose);
+    int result = GetPose(&currentPose);
+    if (result != DobotCommunicate_NoError) {
+        qWarning() << "[CalibrationLogic] ❌ pickPiece() ÉCHEC : impossible de lire la position actuelle";
+        return false;
+    }
     currentPose.z += 30.0f;
 
     qDebug() << "[CalibrationLogic] Extraction du pion : remontée lente de 30mm à z=" << currentPose.z;
-    robot->goTo(currentPose, true);  // true = mouvement de précision (lent) pour l'extraction
+    if (!robot->goTo(currentPose, true)) {  // true = mouvement de précision (lent) pour l'extraction
+        qWarning() << "[CalibrationLogic] ❌ pickPiece() ÉCHEC : impossible d'extraire le pion";
+        return false;
+    }
+
+    qDebug() << "[CalibrationLogic] ✅ pickPiece() réussi";
+    return true;
 }
 
-void CalibrationLogic::dropPiece(int column) {
-    if (!connected || !robot) return;
+bool CalibrationLogic::dropPiece(int column) {
+    if (!connected || !robot) {
+        qWarning() << "[CalibrationLogic] ❌ dropPiece() ÉCHEC : robot non connecté";
+        return false;
+    }
 
     // Vérifier que la colonne est valide (0..6)
     if (column < 0 || column > 6) {
-        qDebug() << "[CalibrationLogic] ERREUR: dropPiece() requiert une colonne entre 0 et 6";
-        return;
+        qWarning() << "[CalibrationLogic] ❌ dropPiece() ÉCHEC : colonne invalide (doit être 0..6)";
+        return false;
     }
 
     // Récupérer la position de la colonne
@@ -685,14 +722,26 @@ void CalibrationLogic::dropPiece(int column) {
 
     // Aller à la colonne de manière sécurisée avec hauteur calculée
     float safeZ = getSafeHeight();
-    robot->goToSecurized(dropPose, safeZ);
+    if (!robot->goToSecurized(dropPose, safeZ)) {
+        qWarning() << "[CalibrationLogic] ❌ dropPiece() ÉCHEC : impossible d'atteindre la colonne";
+        return false;
+    }
 
     // Ouvrir la pince pour lâcher le pion
-    robot->openGripper();
+    if (!robot->openGripper()) {
+        qWarning() << "[CalibrationLogic] ❌ dropPiece() ÉCHEC : impossible d'ouvrir la pince";
+        return false;
+    }
 
     // Petite pause pour s'assurer que le pion est bien lâché
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
     // Désactiver la pince (économie d'énergie et sécurité)
-    robot->turnOffGripper();
+    if (!robot->turnOffGripper()) {
+        qWarning() << "[CalibrationLogic] ❌ dropPiece() ÉCHEC : impossible de couper la pince";
+        return false;
+    }
+
+    qDebug() << "[CalibrationLogic] ✅ dropPiece() réussi";
+    return true;
 }

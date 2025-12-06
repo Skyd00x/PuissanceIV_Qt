@@ -33,11 +33,11 @@ public:
     void emergencyStop(); // Arrêt d'urgence immédiat du robot
 
     // === Mouvements ===
-    void Home();                           // Retourne le robot en position Home
-    void goTo(Pose p, bool precise = false); // Déplacement direct (PTP), precise = vitesse réduite
-    void goToSecurized(Pose p, float safeZ = 150.0f);  // Déplacement sécurisé avec hauteur de sécurité
-    void rotate(float delta);              // Rotation relative de la pince
-    void moveAxis(char axis, float delta); // Déplacement relatif sur un axe ('x', 'y', ou 'z')
+    bool Home();                           // Retourne le robot en position Home (retourne false en cas d'échec)
+    bool goTo(Pose p, bool precise = false); // Déplacement direct (PTP), precise = vitesse réduite (retourne false en cas d'échec)
+    bool goToSecurized(Pose p, float safeZ = 150.0f);  // Déplacement sécurisé avec hauteur de sécurité (retourne false en cas d'échec)
+    bool rotate(float delta);              // Rotation relative de la pince (retourne false en cas d'échec)
+    bool moveAxis(char axis, float delta); // Déplacement relatif sur un axe ('x', 'y', ou 'z') (retourne false en cas d'échec)
     uint64_t moveAxisContinuous(char axis, float delta); // Version non-bloquante, retourne l'index de la commande
     bool isCommandCompleted(uint64_t commandIndex);      // Vérifie si une commande est terminée
 
@@ -46,16 +46,16 @@ public:
     void setPrecisionSpeed();              // Vitesse réduite pour la précision
 
     // === Contrôle de la pince ===
-    void openGripper();          // Ouvre la pince
-    void closeGripper();         // Ferme la pince
-    void turnOffGripper();       // Désactive l’alimentation de la pince
+    bool openGripper();          // Ouvre la pince (retourne false en cas d'échec)
+    bool closeGripper();         // Ferme la pince (retourne false en cas d'échec)
+    bool turnOffGripper();       // Désactive l'alimentation de la pince (retourne false en cas d'échec)
 
 private:
     // === Méthode interne pour le gripper ===
-    void gripper(bool enable, bool grip);
+    bool gripper(bool enable, bool grip);
 
     // === Attente que la file d'attente du robot atteigne un index ===
-    void waitForCompletion(uint64_t targetIndex, int timeoutSeconds = 5);
+    bool waitForCompletion(uint64_t targetIndex, int timeoutSeconds = 5);
 
     // === Mutex récursif pour protéger l'accès concurrent au robot ===
     // Utilisation d'un QRecursiveMutex pour permettre les appels imbriqués
