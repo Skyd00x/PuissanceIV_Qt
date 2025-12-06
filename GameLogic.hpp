@@ -68,11 +68,11 @@ private:
     int gridConfirmCount = 0;             // compteur de détections identiques (besoin de 5)
     static constexpr int GRID_CONFIRM_THRESHOLD = 5;  // nombre de détections nécessaires
 
-    // Anti-cheat : validation de stabilité d'un pion sur 15 images
+    // Anti-cheat : validation de stabilité d'un pion sur 8 images
     QVector<QVector<int>> referenceGrid;  // Grille de référence du dernier tour validé
     QVector<QVector<int>> stableCandidate; // Grille candidate pour validation de stabilité
-    int stabilityConfirmCount = 0;        // Compteur pour valider qu'un pion est stable (15 images)
-    static constexpr int STABILITY_THRESHOLD = 15;  // 15 images pour confirmer qu'un pion est stable
+    int stabilityConfirmCount = 0;        // Compteur pour valider qu'un pion est stable (8 images)
+    static constexpr int STABILITY_THRESHOLD = 8;  // 8 images pour confirmer qu'un pion est stable (réduit de 15 pour éviter les faux positifs d'instabilité)
     bool waitingForStableGrid = false;    // En attente de validation de stabilité
 
     bool gridReady = false;               // caméra OK

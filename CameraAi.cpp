@@ -274,7 +274,7 @@ std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR)
     at::Tensor conf, labels;
     std::tie(conf, labels) = cls_scores.max(1);
 
-    const float confTh = 0.05f;  // Filtrer les prédictions
+    const float confTh = 0.6f;  // Filtrer les prédictions
     at::Tensor keep = conf > confTh;
     boxes_xywh = boxes_xywh.index({keep});
     conf = conf.index({keep});
@@ -290,7 +290,7 @@ std::vector<Detection> CameraAI::inferTorch(const cv::Mat& frameBGR)
     conf = conf.to(torch::kCPU);
     labels = labels.to(torch::kCPU);
 
-    const float iouTh = 0.7f;
+    const float iouTh = 0.5f;
     std::vector<cv::Rect> finalBoxes;
     std::vector<float>    finalScores;
     std::vector<int>      finalClasses;

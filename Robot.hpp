@@ -50,6 +50,11 @@ public:
     bool closeGripper();         // Ferme la pince (retourne false en cas d'échec)
     bool turnOffGripper();       // Désactive l'alimentation de la pince (retourne false en cas d'échec)
 
+    // === Flag d'arrêt d'urgence ===
+    // PUBLIC : Ce flag est utilisé pour arrêter immédiatement toutes les méthodes de mouvement
+    // en cas d'arrêt d'urgence. Il doit être accessible depuis GameLogic::stopGame()
+    std::atomic<bool> emergencyStopFlag{false};
+
 private:
     // === Méthode interne pour le gripper ===
     bool gripper(bool enable, bool grip);
@@ -61,10 +66,5 @@ private:
     // Utilisation d'un QRecursiveMutex pour permettre les appels imbriqués
     // (ex: goToSecurized() appelle goTo() plusieurs fois)
     QRecursiveMutex robotMutex;
-
-    // === Flag d'arrêt d'urgence ===
-    // Ce flag est utilisé pour arrêter immédiatement toutes les méthodes de mouvement
-    // en cas d'arrêt d'urgence, sans bloquer sur le mutex
-    std::atomic<bool> emergencyStopFlag{false};
 };
 

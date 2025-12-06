@@ -242,19 +242,29 @@ void GameLogic::stopGame()
         negamaxThreadObj = nullptr;
     }
 
+    // CRITIQUE : Activer le flag d'arrêt d'urgence du robot pour interrompre
+    // tout thread de repositionnement en cours (qui pourrait bloquer le mutex)
+    if (robot) {
+        qDebug() << "[GameLogic] Activation du flag d'arrêt d'urgence pour interrompre les mouvements en cours...";
+        robot->emergencyStopFlag = true;
+        // Attendre 500ms pour que les threads en cours détectent le flag et se terminent
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+
     // Ouvrir puis fermer la pince pour lâcher tout pion éventuel
     if (robot && robotConnected) {
         qDebug() << "[GameLogic] Ouverture et fermeture de la pince...";
+        // Note: Ces appels retourneront immédiatement false si emergencyStopFlag est activé
         if (!robot->openGripper()) {
-            qWarning() << "[GameLogic] ⚠️ Échec d'ouverture de la pince lors de l'arrêt";
+            qDebug() << "[GameLogic] Ouverture de la pince ignorée (arrêt en cours)";
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
         if (!robot->closeGripper()) {
-            qWarning() << "[GameLogic] ⚠️ Échec de fermeture de la pince lors de l'arrêt";
+            qDebug() << "[GameLogic] Fermeture de la pince ignorée (arrêt en cours)";
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
         if (!robot->turnOffGripper()) {
-            qWarning() << "[GameLogic] ⚠️ Échec de coupure du compresseur lors de l'arrêt";
+            qDebug() << "[GameLogic] Coupure du compresseur ignorée (arrêt en cours)";
         }
     }
 
@@ -393,8 +403,8 @@ void GameLogic::onGridUpdated(const QVector<QVector<int>>& g)
         if (stabilityConfirmCount < STABILITY_THRESHOLD)
             return;
 
-        // Pion stable validé sur 15 images !
-        qDebug() << "[GameLogic] Pion stable validé sur 15 images";
+        // Pion stable validé !
+        qDebug() << "[GameLogic] Pion stable validé sur" << STABILITY_THRESHOLD << "images";
         waitingForStableGrid = false;
         stabilityConfirmCount = 0;
 
@@ -518,14 +528,28 @@ void GameLogic::onGridUpdated(const QVector<QVector<int>>& g)
         // Passage au tour suivant
         if (currentTurn == PlayerTurn) {
             int playedCol = -1;
+            qDebug() << "[GameLogic] *** PHASE 4 : Détection du coup joueur ***";
+            qDebug() << "[GameLogic] playerColor =" << playerColor << "| robotColor =" << robotColor;
+
             if (detectPlayerMove(prevGrid, grid, playedCol)) {
-                qDebug() << "[GameLogic] Coup joueur validé dans colonne" << playedCol;
+                qDebug() << "[GameLogic] ✅ Coup joueur validé dans colonne" << playedCol;
+                currentTurn = RobotTurn;
+                emit turnRobot();
+                launchRobotTurn();
+            } else {
+                qWarning() << "[GameLogic] ⚠️ ERREUR : detectPlayerMove() a retourné FALSE !";
+                qWarning() << "[GameLogic] Le joueur a joué mais le coup n'a pas été détecté correctement";
+                qWarning() << "[GameLogic] playerColor attendu :" << playerColor;
+
+                // Forcer le passage au tour du robot malgré l'échec de détection
+                // Car on sait qu'un pion a été ajouté (vérifié en phase 3)
+                qDebug() << "[GameLogic] Passage forcé au tour du robot";
                 currentTurn = RobotTurn;
                 emit turnRobot();
                 launchRobotTurn();
             }
         } else if (currentTurn == RobotTurn) {
-            qDebug() << "[GameLogic] Coup robot validé, passage au tour du joueur";
+            qDebug() << "[GameLogic] ✅ Coup robot validé, passage au tour du joueur";
             currentTurn = PlayerTurn;
             emit turnPlayer();
         }
@@ -539,15 +563,39 @@ bool GameLogic::detectPlayerMove(const QVector<QVector<int>>& oldG,
                                  const QVector<QVector<int>>& newG,
                                  int& playedColumn)
 {
+    qDebug() << "[GameLogic] detectPlayerMove() - Recherche pion de couleur" << playerColor;
+
+    // Afficher les grilles pour debug
+    QString oldGridStr = "\n[GRILLE PRÉCÉDENTE]\n";
+    for (int r = 0; r < 6; r++) {
+        for (int c = 0; c < 7; c++) {
+            oldGridStr += QString::number(oldG[r][c]) + " ";
+        }
+        oldGridStr += "\n";
+    }
+    qDebug().noquote() << oldGridStr;
+
+    QString newGridStr = "\n[GRILLE ACTUELLE]\n";
+    for (int r = 0; r < 6; r++) {
+        for (int c = 0; c < 7; c++) {
+            newGridStr += QString::number(newG[r][c]) + " ";
+        }
+        newGridStr += "\n";
+    }
+    qDebug().noquote() << newGridStr;
+
     for (int r = 0; r < 6; r++) {
         for (int c = 0; c < 7; c++) {
             // Détecter un nouveau pion de la couleur du joueur
             if (oldG[r][c] == 0 && newG[r][c] == playerColor) {
                 playedColumn = c;
+                qDebug() << "[GameLogic] ✅ Pion trouvé à position [" << r << "," << c << "] colonne" << c;
                 return true;
             }
         }
     }
+
+    qWarning() << "[GameLogic] ❌ Aucun nouveau pion de couleur" << playerColor << "trouvé !";
     return false;
 }
 
