@@ -40,6 +40,7 @@ private:
 
     std::atomic<bool> testRunning;
     std::atomic<bool> shouldStop;
+    std::atomic<bool> isEmergencyStop;  // Distingue arrêt d'urgence de l'arrêt normal
 
     QLabel* titleLabel;
     QLabel* instructionsLabel;
@@ -52,4 +53,5 @@ private:
     QPushButton* stopButton;
     QPushButton* backButton;
     QPushButton* emergencyStopButton;
+    QPushButton* retryButton;  // Bouton pour réessayer la connexion en cas d'échec
 };
