@@ -2,6 +2,7 @@
 
 #include <thread>
 #include <chrono>
+#include <atomic>
 #include <QObject>
 #include <QMutex>
 #include <qdebug.h>
@@ -26,6 +27,7 @@ public:
     // === Connexion au robot ===
     bool connect();       // Connecte le robot si un Dobot est détecté
     void disconnect();    // Déconnecte proprement et vide la file de commandes
+    void emergencyDisconnect(); // Déconnexion d'urgence : arrêt immédiat + coupe compresseur + déconnexion
     static bool isAvailable();   // Vérifie si un Dobot est détectable
     void clearAlarms();   // Clear toutes les alarmes du robot
     void emergencyStop(); // Arrêt d'urgence immédiat du robot
@@ -53,11 +55,16 @@ private:
     void gripper(bool enable, bool grip);
 
     // === Attente que la file d'attente du robot atteigne un index ===
-    void waitForCompletion(uint64_t targetIndex);
+    void waitForCompletion(uint64_t targetIndex, int timeoutSeconds = 5);
 
     // === Mutex récursif pour protéger l'accès concurrent au robot ===
     // Utilisation d'un QRecursiveMutex pour permettre les appels imbriqués
     // (ex: goToSecurized() appelle goTo() plusieurs fois)
     QRecursiveMutex robotMutex;
+
+    // === Flag d'arrêt d'urgence ===
+    // Ce flag est utilisé pour arrêter immédiatement toutes les méthodes de mouvement
+    // en cas d'arrêt d'urgence, sans bloquer sur le mutex
+    std::atomic<bool> emergencyStopFlag{false};
 };
 

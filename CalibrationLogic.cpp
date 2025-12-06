@@ -68,14 +68,18 @@ bool CalibrationLogic::connectToRobot() {
     return connected;
 }
 
-void CalibrationLogic::disconnectToRobot() {
+void CalibrationLogic::disconnectToRobot(bool emergencyMode) {
     // Si déjà déconnecté, ne rien faire (évite le crash de double déconnexion)
     if (!connected) {
         qDebug() << "[CalibrationLogic] Déjà déconnecté, rien à faire";
         return;
     }
 
-    qDebug() << "[CalibrationLogic] Déconnexion du robot...";
+    if (emergencyMode) {
+        qDebug() << "[CalibrationLogic] Déconnexion d'urgence du robot (sans toucher au gripper)...";
+    } else {
+        qDebug() << "[CalibrationLogic] Déconnexion du robot...";
+    }
 
     // Arrêter tous les threads en cours
     shouldStop_ = true;
@@ -84,13 +88,25 @@ void CalibrationLogic::disconnectToRobot() {
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     if (robot) {
-        robot->turnOffGripper();
+        // En mode d'urgence, NE PAS appeler turnOffGripper() car le mutex peut être verrouillé
+        if (!emergencyMode) {
+            robot->turnOffGripper();
+        } else {
+            qDebug() << "[CalibrationLogic] Mode d'urgence : on saute turnOffGripper() pour éviter un deadlock";
+        }
         robot->disconnect();
     }
     connected = false;
     gripperOpen = false;
 
     qDebug() << "[CalibrationLogic] Robot déconnecté";
+}
+
+void CalibrationLogic::setConnectedState(bool state) {
+    connected = state;
+    if (!state) {
+        gripperOpen = false;
+    }
 }
 
 void CalibrationLogic::homeRobot() {

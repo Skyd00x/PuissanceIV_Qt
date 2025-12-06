@@ -80,6 +80,7 @@ private:
     int currentStep = -1;
 
     bool isConnecting = false;
+    bool emergencyStopActivated = false;  // Flag pour détecter si arrêt d'urgence a été déclenché
 
     QLabel* titleLabel;
     QProgressBar* progressBar;
@@ -102,6 +103,7 @@ private:
     QMovie* loadingMovie;
     QPushButton* startButton;
     QPushButton* retryButton;
+    QPushButton* emergencyStopButtonIntro;  // Bouton d'arrêt d'urgence pendant le Home
 
     QTextBrowser* instructionsView;
     QLabel* imageLabel;

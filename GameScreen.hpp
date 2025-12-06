@@ -42,11 +42,12 @@ public slots:
     void showEmergencyStopOverlay();   // Afficher l'overlay d'arrêt d'urgence
 
 signals:
-    void quitRequested();          // L'utilisateur veut quitter la partie
-    void prepareGame();            // Avant le countdown → préparer le robot
-    void countdownFinished();      // Fin du compte à rebours → GameLogic démarre
-    void reservoirsRefilled();     // L'utilisateur a rempli les réservoirs
-    void emergencyStopRequested(); // Arrêt d'urgence du robot demandé
+    void quitRequested();               // L'utilisateur veut quitter la partie
+    void emergencyStopQuitRequested();  // L'utilisateur veut quitter après un arrêt d'urgence
+    void prepareGame();                 // Avant le countdown → préparer le robot
+    void countdownFinished();           // Fin du compte à rebours → GameLogic démarre
+    void reservoirsRefilled();          // L'utilisateur a rempli les réservoirs
+    void emergencyStopRequested();      // Arrêt d'urgence du robot demandé
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
@@ -63,6 +64,8 @@ private:
     void createGameWidget();
     void createConfirmWidget();
     void createInitializingWidget();
+    void createEmergencyStopWidget();
+    void createConnectionErrorWidget();
 
 private:
     QStackedWidget *stack;
@@ -71,6 +74,8 @@ private:
     QWidget *initializingWidget;   // Widget d'initialisation (avant le jeu)
     QWidget *gameWidget;
     QWidget *confirmWidget;
+    QWidget *emergencyStopWidget;  // Widget d'arrêt d'urgence
+    QWidget *connectionErrorWidget; // Widget d'erreur de connexion
 
     // Éléments du jeu
     QPushButton *quitButton;
@@ -97,6 +102,7 @@ private:
     QLabel *initializingLabel;          // Label de statut (ex: "Mise en position initiale...")
     QLabel *initializingLoadingLabel;   // Label pour le GIF de chargement
     QMovie *initializingLoadingMovie;   // Animation de chargement
+    QPushButton *emergencyStopButtonInit;  // Bouton d'arrêt d'urgence pendant le Home
 
     // Overlay pour triche détectée
     QWidget *cheatOverlay;
@@ -113,14 +119,12 @@ private:
     QLabel *resultLabel;
     QPushButton *resultQuitButton;
 
-    // Overlay pour erreur de connexion au robot
-    QWidget *connectionErrorOverlay;
+    // Éléments du widget d'erreur de connexion
     QLabel *connectionErrorLabel;
     QPushButton *retryConnectionButton;
     QPushButton *quitFromConnectionErrorButton;
 
-    // Overlay pour arrêt d'urgence
-    QWidget *emergencyStopOverlay;
+    // Éléments du widget d'arrêt d'urgence
     QLabel *emergencyStopLabel;
     QPushButton *emergencyStopQuitButton;
 

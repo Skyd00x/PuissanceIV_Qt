@@ -31,6 +31,7 @@ public slots:
     void prepareGame();        // avant le countdown - connexion robot et home
     void startGame();          // après countdownFinished() - démarrage caméra et jeu
     void stopGame();           // bouton quitter
+    void emergencyStopGame();  // arrêt d'urgence - arrête tout proprement sans toucher au robot
     void onGridUpdated(const QVector<QVector<int>>& g);
     void onReservoirsRefilled(); // Appelé quand l'utilisateur a rempli les réservoirs
     void resetRobotConnection(); // Réinitialise l'état de connexion du robot

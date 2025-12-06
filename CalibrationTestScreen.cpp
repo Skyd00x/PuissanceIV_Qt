@@ -136,13 +136,22 @@ CalibrationTestScreen::CalibrationTestScreen(Robot *robot, CalibrationLogic* cal
     connect(backButton, &QPushButton::clicked, this, &CalibrationTestScreen::onBackToMenuClicked);
     connect(retryButton, &QPushButton::clicked, this, &CalibrationTestScreen::onStartTestClicked);  // Réutilise la même fonction
     connect(emergencyStopButton, &QPushButton::clicked, this, [this]() {
+        // Éviter les clics multiples
+        if (this->isEmergencyStop) {
+            return;
+        }
+
         qDebug() << "[CalibrationTestScreen] ARRÊT D'URGENCE activé !";
 
-        // Arrêt immédiat du robot et coupure du compresseur
-        this->robot->emergencyStop();
-        this->robot->turnOffGripper();  // Couper le compresseur
+        // Marquer comme arrêt d'urgence
+        this->isEmergencyStop = true;
         this->shouldStop = true;
-        this->isEmergencyStop = true;  // Marquer comme arrêt d'urgence
+
+        // Désactiver le bouton pour éviter les clics multiples
+        this->emergencyStopButton->setEnabled(false);
+
+        // Arrêt immédiat du robot (arrête toutes les commandes, y compris la pince)
+        this->robot->emergencyStop();
 
         // Arrêter le test et mettre à jour l'interface
         QMetaObject::invokeMethod(this, [this]() {

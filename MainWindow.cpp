@@ -2,6 +2,7 @@
 #include <QCloseEvent>
 #include <QDebug>
 #include <QTimer>
+#include <thread>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -51,10 +52,13 @@ MainWindow::MainWindow(QWidget *parent)
 
     // === CONNEXIONS GAME SCREEN ↔ GAME LOGIC ===
     connect(gameScreen, &GameScreen::quitRequested, this, [this]() {
-        gameLogic->stopGame();
+        qDebug() << "[MainWindow] Quit demandé depuis GameScreen";
         gameScreen->resetGame();  // Reset complet de l'écran de jeu
 
-        // Réinitialiser l'état de connexion du robot pour refaire Home() à la prochaine partie
+        // CRITIQUE : S'assurer que TOUT est arrêté et déconnecté avant de retourner au menu
+        ensureFullyDisconnected();
+
+        // Réinitialiser l'état de connexion pour refaire Home() à la prochaine partie
         gameLogic->resetRobotConnection();
 
         showMenu();
@@ -67,9 +71,65 @@ MainWindow::MainWindow(QWidget *parent)
             gameLogic, &GameLogic::startGame);
 
     connect(gameScreen, &GameScreen::emergencyStopRequested, this, [this]() {
-        qDebug() << "[MainWindow] Arrêt d'urgence demandé depuis GameScreen";
-        robot->emergencyStop();
+        qDebug() << "[MainWindow] ⚠️ ARRÊT D'URGENCE demandé depuis GameScreen";
+
+        // 1. Afficher l'overlay immédiatement pour donner un feedback visuel
         gameScreen->showEmergencyStopOverlay();
+
+        // 2. Arrêter le robot ET couper le compresseur IMMÉDIATEMENT (sans bloquer)
+        qDebug() << "[MainWindow] Déconnexion d'urgence du robot (arrêt + compresseur)...";
+        robot->emergencyDisconnect();
+
+        // 3. Activer le flag pour indiquer qu'un arrêt d'urgence est en cours
+        emergencyStopInProgress = true;
+
+        // 4. Lancer le nettoyage du jeu dans un thread séparé pour ne pas bloquer l'interface
+        qDebug() << "[MainWindow] Lancement du nettoyage du jeu dans un thread séparé...";
+        std::thread([this]() {
+            gameLogic->emergencyStopGame();
+            qDebug() << "[MainWindow] Nettoyage du jeu terminé";
+            // Désactiver le flag une fois le nettoyage terminé
+            emergencyStopInProgress = false;
+            qDebug() << "[MainWindow] Flag emergencyStopInProgress désactivé";
+        }).detach();
+    });
+
+    connect(gameScreen, &GameScreen::emergencyStopQuitRequested, this, [this]() {
+        qDebug() << "[MainWindow] Retour au menu après arrêt d'urgence demandé";
+
+        // CRITIQUE : Attendre que le thread d'arrêt d'urgence soit terminé SANS bloquer l'interface
+        // Lancer l'attente dans un thread séparé pour ne pas bloquer l'UI
+        qDebug() << "[MainWindow] Lancement de l'attente du thread d'arrêt d'urgence (asynchrone)...";
+        std::thread([this]() {
+            qDebug() << "[MainWindow] Attente de la fin du thread d'arrêt d'urgence...";
+            int waitCount = 0;
+            while (emergencyStopInProgress && waitCount < 50) {  // Max 5 secondes (50 * 100ms)
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                waitCount++;
+            }
+
+            if (emergencyStopInProgress) {
+                qWarning() << "[MainWindow] TIMEOUT : Le thread d'arrêt d'urgence n'a pas terminé après 5 secondes !";
+                qWarning() << "[MainWindow] On continue quand même vers le menu...";
+            } else {
+                qDebug() << "[MainWindow] Thread d'arrêt d'urgence terminé après" << (waitCount * 100) << "ms";
+            }
+
+            // Une fois terminé, retourner au menu dans le thread principal
+            QMetaObject::invokeMethod(this, [this]() {
+                qDebug() << "[MainWindow] Retour au menu principal - Reset + show menu";
+
+                // Reset de l'écran de jeu AVANT d'afficher le menu (évite les double-clics)
+                gameScreen->resetGame();
+
+                // Tout est déjà arrêté par emergencyStopGame() et emergencyDisconnect()
+                // Réinitialiser l'état de connexion pour refaire Home() à la prochaine partie
+                gameLogic->resetRobotConnection();
+
+                qDebug() << "[MainWindow] Affichage du menu";
+                showMenu();
+            }, Qt::QueuedConnection);
+        }).detach();
     });
 
     connect(gameLogic, &GameLogic::turnPlayer,
@@ -147,12 +207,13 @@ MainWindow::MainWindow(QWidget *parent)
 
     // === CONNEXIONS CALIBRATION ===
     connect(calibrationScreen, &CalibrationScreen::backToMenuRequested, this, [this]() {
-        qDebug() << "[MainWindow] Signal backToMenuRequested reçu";
+        qDebug() << "[MainWindow] Signal backToMenuRequested reçu depuis CalibrationScreen";
 
-        // IMPORTANT : Le robot a déjà été déconnecté dans CalibrationScreen::onQuitButtonClicked()
-        // On évite donc la double déconnexion qui pourrait causer un crash
+        // CRITIQUE : S'assurer que TOUT est arrêté et déconnecté avant de retourner au menu
+        // (robot->disconnect() vérifie si connecté avant de déconnecter, donc pas de double déconnexion)
+        ensureFullyDisconnected();
 
-        // Informer GameLogic que le robot a été déconnecté
+        // Réinitialiser l'état de connexion pour refaire Home() à la prochaine partie
         gameLogic->resetRobotConnection();
         qDebug() << "[MainWindow] État de connexion réinitialisé dans GameLogic";
 
@@ -184,8 +245,10 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     // === CONNEXIONS EXPLANATION ===
-    connect(explanationScreen, &ExplanationScreen::backToMenu,
-            this, &MainWindow::showMenu);
+    connect(explanationScreen, &ExplanationScreen::backToMenu, this, [this]() {
+        // Animation verticale vers le bas pour retourner au menu
+        animateVerticalTransition(explanationScreen, mainMenu, false);
+    });
 
     // === CONNEXIONS INTRO → CHECK → MENU ===
     connect(introScreen, &IntroScreen::introFinished, this, [this]() {
@@ -194,6 +257,8 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     connect(checkScreen, &CheckDevicesScreen::readyToContinue, this, [this]() {
+        // Normalement pas nécessaire ici (robot pas connecté), mais par sécurité
+        ensureFullyDisconnected();
         showMenu();
     });
 
@@ -231,6 +296,42 @@ void MainWindow::showCheck()
     stack->setCurrentWidget(checkScreen);
 }
 
+// ============================================================================
+//  ENSURE FULLY DISCONNECTED - S'assurer que TOUT est arrêté avant showMenu()
+// ============================================================================
+void MainWindow::ensureFullyDisconnected()
+{
+    qDebug() << "[MainWindow] ========================================";
+    qDebug() << "[MainWindow] ENSURE FULLY DISCONNECTED - Vérification complète avant retour menu";
+    qDebug() << "[MainWindow] ========================================";
+
+    // 1. Arrêter la caméra (au cas où elle tourne encore)
+    qDebug() << "[MainWindow] Arrêt de la caméra...";
+    if (cameraAI) {
+        cameraAI->stop();
+    }
+
+    // 2. Arrêter tous les threads de gameLogic (negamax, préparation, etc.)
+    qDebug() << "[MainWindow] Arrêt de tous les threads de gameLogic...";
+    if (gameLogic) {
+        gameLogic->stopGame();  // Arrête tous les threads et déconnecte le robot proprement
+    }
+
+    // 3. S'assurer que le robot est bien déconnecté (sécurité finale)
+    //    Utilise CalibrationLogic qui vérifie si déjà déconnecté (évite double déconnexion)
+    qDebug() << "[MainWindow] Vérification finale de la déconnexion du robot...";
+    if (calibrationScreen && calibrationScreen->getCalibrationLogic()) {
+        calibrationScreen->getCalibrationLogic()->disconnectToRobot();
+    }
+
+    // 4. Petit délai pour laisser le temps à tout de se terminer proprement
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    qDebug() << "[MainWindow] ========================================";
+    qDebug() << "[MainWindow] TOUT EST ARRÊTÉ ET DÉCONNECTÉ - Retour au menu sécurisé";
+    qDebug() << "[MainWindow] ========================================";
+}
+
 void MainWindow::showMenu()
 {
     mainMenu->resetToMainMenu();  // Reset le menu au principal
@@ -250,7 +351,8 @@ void MainWindow::showCalibrationTest()
 
 void MainWindow::showExplanation()
 {
-    stack->setCurrentWidget(explanationScreen);
+    // Animation verticale vers le haut (comme pour showCalibrationTest mais vertical)
+    animateVerticalTransition(stack->currentWidget(), explanationScreen, true);
 }
 
 void MainWindow::showGame()
@@ -304,16 +406,56 @@ void MainWindow::animateTransition(QWidget *from, QWidget *to, bool forward)
     group->start(QAbstractAnimation::DeleteWhenStopped);
 }
 
+void MainWindow::animateVerticalTransition(QWidget *from, QWidget *to, bool upward)
+{
+    if (!from || !to) return;
+
+    int w = stack->width();
+    int h = stack->height();
+
+    // Position selon la direction
+    // upward=true : le nouveau vient du bas (y=h au départ) et monte, l'ancien sort par le haut (y=-h)
+    // upward=false : le nouveau vient du haut (y=-h au départ) et descend, l'ancien sort par le bas (y=h)
+    int startYTo = upward ? h : -h;
+    int endYTo   = 0;
+    int endYFrom = upward ? -h : h;
+
+    to->setGeometry(0, startYTo, w, h);
+    to->show();
+
+    auto *slideOut = new QPropertyAnimation(from, "geometry");
+    slideOut->setDuration(400);
+    slideOut->setEasingCurve(QEasingCurve::InOutQuad);
+    slideOut->setStartValue(QRect(0, 0, w, h));
+    slideOut->setEndValue(QRect(0, endYFrom, w, h));
+
+    auto *slideIn = new QPropertyAnimation(to, "geometry");
+    slideIn->setDuration(400);
+    slideIn->setEasingCurve(QEasingCurve::InOutQuad);
+    slideIn->setStartValue(QRect(0, startYTo, w, h));
+    slideIn->setEndValue(QRect(0, endYTo, w, h));
+
+    connect(slideOut, &QPropertyAnimation::finished, [this, to]() {
+        stack->setCurrentWidget(to);
+    });
+
+    auto *group = new QParallelAnimationGroup(this);
+    group->addAnimation(slideOut);
+    group->addAnimation(slideIn);
+    group->start(QAbstractAnimation::DeleteWhenStopped);
+}
+
 // =====================================================
 //      FERMETURE DE LA FENÊTRE
 // =====================================================
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    if (gameLogic)
-        gameLogic->stopGame();
-    if (cameraAI)
-        cameraAI->stop();
+    qDebug() << "[MainWindow] Fermeture de l'application demandée";
 
+    // CRITIQUE : S'assurer que TOUT est arrêté et déconnecté avant de fermer
+    ensureFullyDisconnected();
+
+    qDebug() << "[MainWindow] Fermeture propre effectuée";
     event->accept();
 }

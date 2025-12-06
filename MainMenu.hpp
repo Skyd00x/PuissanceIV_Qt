@@ -8,6 +8,7 @@
 #include <QParallelAnimationGroup>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QResizeEvent>
 #include "StateMachine.hpp"
 
 class MainMenu : public QWidget
@@ -18,6 +19,9 @@ public:
     explicit MainMenu(QWidget *parent = nullptr);
 
     void resetToMainMenu();  // Retourne au menu principal
+
+protected:
+    void resizeEvent(QResizeEvent *event) override;
 
 signals:
     void startGame(StateMachine::Difficulty difficulty, StateMachine::PlayerColor color);
@@ -50,8 +54,9 @@ private:
     QWidget *colorWidget;
     QWidget *confirmWidget;
 
-    // Bouton aide
+    // Bouton aide et logo (positionnés de manière absolue)
     QPushButton *helpButton;
+    QLabel *logoLabel;
 
     // Menu principal
     QLabel *titleLabel;

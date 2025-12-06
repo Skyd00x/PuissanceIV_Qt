@@ -45,7 +45,8 @@ public:
     explicit CalibrationLogic(Robot* robot, QObject* parent = nullptr);
 
     bool connectToRobot();
-    void disconnectToRobot();
+    void disconnectToRobot(bool emergencyMode = false);
+    void setConnectedState(bool state);  // Met à jour le flag connected (pour arrêt d'urgence)
     void homeRobot();
     void startCalibration();
     void recordStep(int index);

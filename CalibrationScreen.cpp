@@ -64,13 +64,16 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
 
         startButton = new QPushButton("Commencer la calibration");
         retryButton = new QPushButton("Réessayer la connexion");
+        emergencyStopButtonIntro = new QPushButton("ARRÊT D'URGENCE");
         startButton->hide();
         retryButton->hide();
+        emergencyStopButtonIntro->hide();
 
         introLayout->addWidget(introLabel, 0, Qt::AlignCenter);
         introLayout->addWidget(loadingLabel, 0, Qt::AlignCenter);
         introLayout->addWidget(startButton, 0, Qt::AlignCenter);
         introLayout->addWidget(retryButton, 0, Qt::AlignCenter);
+        introLayout->addWidget(emergencyStopButtonIntro, 0, Qt::AlignCenter);
         stackedLayout->addWidget(introWidget);
     }
 
@@ -308,6 +311,15 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         }
     }
 
+    // Style spécial pour le bouton d'arrêt d'urgence
+    emergencyStopButtonIntro->setFixedSize(320, 60);
+    emergencyStopButtonIntro->setStyleSheet(
+        "QPushButton { background-color: #FF0000; color: white; font-size: 22px; font-weight: bold; border-radius: 30px; }"
+        "QPushButton:hover { background-color: #CC0000; }"
+        "QPushButton:pressed { background-color: #990000; }"
+    );
+    emergencyStopButtonIntro->setCursor(Qt::PointingHandCursor);
+
     // === LOGIQUE ===
     logic = new CalibrationLogic(robot, this);
     connect(logic, &CalibrationLogic::progressChanged, this, &CalibrationScreen::onLogicProgress);
@@ -434,6 +446,38 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
 
     connect(retryButton, &QPushButton::clicked, this, &CalibrationScreen::attemptConnection);
 
+    connect(emergencyStopButtonIntro, &QPushButton::clicked, this, [this]() {
+        // Éviter les clics multiples
+        if (this->emergencyStopActivated) {
+            qDebug() << "[CalibrationScreen] Arrêt d'urgence déjà activé, clic ignoré";
+            return;
+        }
+
+        qDebug() << "[CalibrationScreen] ARRÊT D'URGENCE activé pendant le Home !";
+
+        // Marquer qu'un arrêt d'urgence a été déclenché
+        this->emergencyStopActivated = true;
+
+        // Désactiver le bouton pour éviter les clics multiples
+        this->emergencyStopButtonIntro->setEnabled(false);
+
+        // Arrêt immédiat du robot (arrête toutes les commandes, y compris la pince)
+        this->robot->emergencyStop();
+
+        // Arrêter le thread de Home dans CalibrationLogic
+        this->logic->disconnectToRobot();
+
+        // Mettre à jour l'interface
+        this->loadingMovie->stop();
+        this->loadingLabel->hide();
+        this->emergencyStopButtonIntro->hide();
+
+        this->introLabel->setText("<b>ARRÊT D'URGENCE ACTIVÉ</b><br><br>"
+                           "Le robot a été arrêté immédiatement.<br>"
+                           "Utilisez le bouton 'Quitter' pour retourner au menu principal.");
+        this->introLabel->setStyleSheet("font-size: 26px; color: #FF0000; font-weight: bold;");
+    });
+
     // === CRÉATION DU WIDGET DE CONFIRMATION ===
     createConfirmWidget();
 
@@ -468,8 +512,13 @@ void CalibrationScreen::attemptConnection() {
         return;
     }
     isConnecting = true;
+    emergencyStopActivated = false;  // Réinitialiser le flag d'arrêt d'urgence
+
+    // Réactiver le bouton d'arrêt d'urgence
+    emergencyStopButtonIntro->setEnabled(true);
 
     introLabel->setText("Connexion au robot en cours...");
+    introLabel->setStyleSheet("font-size: 26px; color: #1B3B5F; font-weight: bold;");  // Reset du style
     loadingLabel->show();
     loadingMovie->start();
     retryButton->hide();
@@ -500,21 +549,31 @@ void CalibrationScreen::onConnectionFinished(bool success) {
     }
 
     introLabel->setText("Remise en position initiale du robot");
+    introLabel->setStyleSheet("font-size: 26px; color: #1B3B5F; font-weight: bold;");  // Reset du style
     startButton->hide();
     retryButton->hide();
     loadingLabel->show();
     loadingMovie->start();
+    emergencyStopButtonIntro->show();  // Afficher le bouton d'arrêt d'urgence pendant le Home
 
     logic->homeRobot();
 }
 
 void CalibrationScreen::onRobotReady() {
+    // Si un arrêt d'urgence a été déclenché, ne pas mettre à jour l'interface
+    if (emergencyStopActivated) {
+        qDebug() << "[CalibrationScreen] Arrêt d'urgence actif, onRobotReady ignoré";
+        return;
+    }
+
     loadingMovie->stop();
     loadingLabel->hide();
+    emergencyStopButtonIntro->hide();  // Cacher le bouton d'arrêt d'urgence
 
     introLabel->setText("Le robot est maintenant prêt.<br>"
                         "Les manipulations à effectuer seront affichées tout au long de la calibration.<br>"
                         "<br><em>La durée estimée est de 5 minutes.</em><br>");
+    introLabel->setStyleSheet("font-size: 26px; color: #1B3B5F; font-weight: bold;");  // Reset du style
 
     // Réappliquer complètement le style du bouton pour s'assurer qu'il s'affiche correctement
     styleButton(startButton);
@@ -769,6 +828,7 @@ void CalibrationScreen::resetCalibration() {
 
     // Autoriser la prochaine tentative
     isConnecting = false;
+    emergencyStopActivated = false;  // Réinitialiser le flag d'arrêt d'urgence
 
     // Revenir à l'intro
     prepareIntroUI("Connexion au robot en cours...");

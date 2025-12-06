@@ -17,10 +17,14 @@ GameScreen::GameScreen(QWidget *parent)
     createInitializingWidget();
     createGameWidget();
     createConfirmWidget();
+    createEmergencyStopWidget();
+    createConnectionErrorWidget();
 
     stack->addWidget(initializingWidget);
     stack->addWidget(gameWidget);
     stack->addWidget(confirmWidget);
+    stack->addWidget(emergencyStopWidget);
+    stack->addWidget(connectionErrorWidget);
     stack->setCurrentWidget(gameWidget);
 
     // === LAYOUT GLOBAL ===
@@ -316,109 +320,9 @@ void GameScreen::createGameWidget()
     resultLayout->addSpacing(40);
     resultLayout->addWidget(resultQuitButton, 0, Qt::AlignCenter);
 
-    // ============================
-    //   OVERLAY ERREUR DE CONNEXION ROBOT
-    // ============================
-    connectionErrorOverlay = new QWidget(gameWidget);
-    connectionErrorOverlay->setStyleSheet("background-color: rgba(0, 0, 0, 180);");
-    connectionErrorOverlay->hide();
-
-    QVBoxLayout *connectionErrorLayout = new QVBoxLayout(connectionErrorOverlay);
-    connectionErrorLayout->setAlignment(Qt::AlignCenter);
-
-    connectionErrorLabel = new QLabel("ERREUR DE CONNEXION\nImpossible de se connecter au robot");
-    connectionErrorLabel->setAlignment(Qt::AlignCenter);
-    connectionErrorLabel->setStyleSheet(
-        "background-color: rgba(231, 76, 60, 230);"
-        "color: white;"
-        "font-size: 32px;"
-        "font-weight: bold;"
-        "padding: 35px 120px;"
-        "border-radius: 15px;"
-        );
-    connectionErrorLabel->setWordWrap(true);
-    connectionErrorLabel->setMinimumWidth(1000);
-
-    auto *connectionErrorShadow = new QGraphicsDropShadowEffect;
-    connectionErrorShadow->setBlurRadius(40);
-    connectionErrorShadow->setOffset(0, 8);
-    connectionErrorShadow->setColor(QColor(0, 0, 0, 180));
-    connectionErrorLabel->setGraphicsEffect(connectionErrorShadow);
-
-    retryConnectionButton = new QPushButton("Réessayer la connexion");
-    retryConnectionButton->setFixedSize(350, 70);
-    retryConnectionButton->setStyleSheet(
-        "QPushButton { background-color: #2ECC71; color: white; font-size: 24px; font-weight: bold; border-radius: 35px; }"
-        "QPushButton:hover { background-color: #27AE60; }"
-        "QPushButton:pressed { background-color: #1E8449; }"
-        );
-    retryConnectionButton->setCursor(Qt::PointingHandCursor);
-    connect(retryConnectionButton, &QPushButton::clicked, [this]() {
-        connectionErrorOverlay->hide();
-        emit prepareGame();  // Réessayer la connexion
-    });
-
-    quitFromConnectionErrorButton = new QPushButton("Retour au menu");
-    quitFromConnectionErrorButton->setFixedSize(250, 70);
-    quitFromConnectionErrorButton->setStyleSheet(
-        "QPushButton { background-color: #E74C3C; color: white; font-size: 24px; font-weight: bold; border-radius: 35px; }"
-        "QPushButton:hover { background-color: #C0392B; }"
-        "QPushButton:pressed { background-color: #A93226; }"
-        );
-    quitFromConnectionErrorButton->setCursor(Qt::PointingHandCursor);
-    connect(quitFromConnectionErrorButton, &QPushButton::clicked, this, &GameScreen::onQuitButtonClicked);
-
-    QHBoxLayout *connectionErrorButtonLayout = new QHBoxLayout;
-    connectionErrorButtonLayout->addWidget(retryConnectionButton);
-    connectionErrorButtonLayout->addSpacing(30);
-    connectionErrorButtonLayout->addWidget(quitFromConnectionErrorButton);
-
-    connectionErrorLayout->addWidget(connectionErrorLabel);
-    connectionErrorLayout->addSpacing(30);
-    connectionErrorLayout->addLayout(connectionErrorButtonLayout);
-
-    // ============================
-    //   OVERLAY ARRÊT D'URGENCE
-    // ============================
-    emergencyStopOverlay = new QWidget(gameWidget);
-    emergencyStopOverlay->setStyleSheet("background-color: rgba(0, 0, 0, 200);");
-    emergencyStopOverlay->hide();
-
-    QVBoxLayout *emergencyStopLayout = new QVBoxLayout(emergencyStopOverlay);
-    emergencyStopLayout->setAlignment(Qt::AlignCenter);
-
-    emergencyStopLabel = new QLabel("⚠️ ARRÊT D'URGENCE ACTIVÉ ⚠️\n\nLe robot a été arrêté immédiatement.\nLa partie est terminée.");
-    emergencyStopLabel->setAlignment(Qt::AlignCenter);
-    emergencyStopLabel->setStyleSheet(
-        "background-color: rgba(255, 0, 0, 240);"
-        "color: white;"
-        "font-size: 36px;"
-        "font-weight: bold;"
-        "padding: 40px 80px;"
-        "border-radius: 20px;"
-    );
-    emergencyStopLabel->setWordWrap(true);
-    emergencyStopLabel->setMinimumWidth(900);
-
-    auto *emergencyStopShadow = new QGraphicsDropShadowEffect;
-    emergencyStopShadow->setBlurRadius(50);
-    emergencyStopShadow->setOffset(0, 10);
-    emergencyStopShadow->setColor(QColor(255, 0, 0, 200));
-    emergencyStopLabel->setGraphicsEffect(emergencyStopShadow);
-
-    emergencyStopQuitButton = new QPushButton("Retour au menu principal");
-    emergencyStopQuitButton->setFixedSize(380, 80);
-    emergencyStopQuitButton->setStyleSheet(
-        "QPushButton { background-color: #E0E0E0; color: #1B3B5F; font-size: 26px; font-weight: bold; border-radius: 40px; }"
-        "QPushButton:hover { background-color: #D0D0D0; }"
-        "QPushButton:pressed { background-color: #A8A8A8; }"
-    );
-    emergencyStopQuitButton->setCursor(Qt::PointingHandCursor);
-    connect(emergencyStopQuitButton, &QPushButton::clicked, this, &GameScreen::onQuitButtonClicked);
-
-    emergencyStopLayout->addWidget(emergencyStopLabel);
-    emergencyStopLayout->addSpacing(40);
-    emergencyStopLayout->addWidget(emergencyStopQuitButton, 0, Qt::AlignCenter);
+    // NOTE: Les widgets d'erreur de connexion et d'arrêt d'urgence
+    // sont maintenant créés séparément via createConnectionErrorWidget() et createEmergencyStopWidget()
+    // et ajoutés au stack principal au lieu d'être des overlays
 
     // Layout pour le countdown centré
     QVBoxLayout *countdownLayout = new QVBoxLayout;
@@ -555,8 +459,37 @@ void GameScreen::createInitializingWidget()
     initializingLoadingLabel->setScaledContents(true);
     initializingLoadingLabel->setAlignment(Qt::AlignCenter);
 
+    // Bouton d'arrêt d'urgence pendant le Home
+    emergencyStopButtonInit = new QPushButton("ARRÊT D'URGENCE", initializingWidget);
+    emergencyStopButtonInit->setFixedSize(320, 60);
+    emergencyStopButtonInit->setStyleSheet(
+        "QPushButton { background-color: #FF0000; color: white; font-size: 22px; font-weight: bold; border-radius: 30px; }"
+        "QPushButton:hover { background-color: #CC0000; }"
+        "QPushButton:pressed { background-color: #990000; }"
+    );
+    emergencyStopButtonInit->setCursor(Qt::PointingHandCursor);
+
     layout->addWidget(initializingLabel, 0, Qt::AlignCenter);
     layout->addWidget(initializingLoadingLabel, 0, Qt::AlignCenter);
+    layout->addWidget(emergencyStopButtonInit, 0, Qt::AlignCenter);
+
+    // Connexion du bouton d'arrêt d'urgence
+    connect(emergencyStopButtonInit, &QPushButton::clicked, this, [this]() {
+        qDebug() << "[GameScreen] ARRÊT D'URGENCE activé pendant le Home !";
+
+        // Désactiver le bouton pour éviter les clics multiples
+        emergencyStopButtonInit->setEnabled(false);
+
+        // Arrêter l'animation de chargement
+        initializingLoadingMovie->stop();
+        initializingLoadingLabel->hide();
+
+        // Mettre à jour le message
+        initializingLabel->setText("<b>ARRÊT D'URGENCE ACTIVÉ</b><br><br>Le robot a été arrêté immédiatement.");
+        initializingLabel->setStyleSheet("font-size: 26px; color: #FF0000; font-weight: bold;");
+
+        emit emergencyStopRequested();  // Signaler l'arrêt d'urgence à GameLogic
+    });
 }
 
 // ============================================================
@@ -584,7 +517,6 @@ void GameScreen::resetGame()
     cheatOverlay->hide();
     reservoirOverlay->hide();
     resultOverlay->hide();
-    connectionErrorOverlay->hide();
 
     // Réinitialiser les labels
     titleLabel->setText("Partie en mode ");
@@ -594,7 +526,7 @@ void GameScreen::resetGame()
     // S'assurer que le gameWidget est visible
     gameWidget->show();
 
-    // Retour au widget de jeu
+    // Retour au widget de jeu (cela cache automatiquement les widgets d'erreur et d'arrêt d'urgence)
     stack->setCurrentWidget(gameWidget);
     qDebug() << "[GameScreen] gameWidget is now current widget";
 }
@@ -611,6 +543,7 @@ void GameScreen::startGame()
 
     // Tout est caché pendant le countdown
     quitButton->hide();
+    emergencyStopButton->hide();  // Caché pendant le countdown
     titleLabel->hide();
     timerLabel->hide();
     turnLabel->hide();
@@ -806,6 +739,11 @@ void GameScreen::showGridIncompleteWarning(int detectedCount)
 // ============================================================
 void GameScreen::showRobotInitializing()
 {
+    // Réinitialiser l'état du widget d'initialisation
+    initializingLabel->setText("Mise en position initiale du robot...");
+    initializingLabel->setStyleSheet("font-size: 26px; color: #1B3B5F; font-weight: bold;");
+    emergencyStopButtonInit->setEnabled(true);
+    initializingLoadingLabel->show();
     initializingLoadingMovie->start();
     stack->setCurrentWidget(initializingWidget);
 }
@@ -890,13 +828,8 @@ bool GameScreen::isReservoirOverlayVisible() const
 // ============================================================
 void GameScreen::showConnectionError()
 {
-    // Revenir au gameWidget si on était sur l'écran d'initialisation
-    stack->setCurrentWidget(gameWidget);
-
-    // Afficher l'overlay d'erreur de connexion
-    connectionErrorOverlay->setGeometry(gameWidget->rect());
-    connectionErrorOverlay->show();
-    connectionErrorOverlay->raise();
+    // Afficher le widget d'erreur de connexion
+    stack->setCurrentWidget(connectionErrorWidget);
 }
 
 void GameScreen::showEmergencyStopOverlay()
@@ -904,13 +837,145 @@ void GameScreen::showEmergencyStopOverlay()
     // Arrêter le chronomètre
     chronometer.stop();
 
-    // Revenir au gameWidget si nécessaire
-    stack->setCurrentWidget(gameWidget);
+    // Réinitialiser le bouton "Retour au menu" (au cas où il aurait été désactivé)
+    emergencyStopQuitButton->setEnabled(true);
+    emergencyStopQuitButton->setText("Retour au menu principal");
 
-    // Afficher l'overlay d'arrêt d'urgence
-    emergencyStopOverlay->setGeometry(gameWidget->rect());
-    emergencyStopOverlay->show();
-    emergencyStopOverlay->raise();
+    // Afficher le widget d'arrêt d'urgence
+    stack->setCurrentWidget(emergencyStopWidget);
+}
+
+// ============================================================
+//   EVENT DE REDIMENSIONNEMENT
+// ============================================================
+// ============================================================
+// CRÉATION DU WIDGET D'ARRÊT D'URGENCE
+// ============================================================
+void GameScreen::createEmergencyStopWidget()
+{
+    emergencyStopWidget = new QWidget(this);
+
+    QVBoxLayout *layout = new QVBoxLayout(emergencyStopWidget);
+    layout->setContentsMargins(60, 40, 60, 40);
+    layout->setSpacing(30);
+    layout->setAlignment(Qt::AlignCenter);
+
+    // === TITRE ===
+    QLabel *titleLabel = new QLabel("Arrêt d'urgence", emergencyStopWidget);
+    titleLabel->setAlignment(Qt::AlignCenter);
+    titleLabel->setStyleSheet("font-size: 60px; font-weight: bold; color: #1B3B5F;");
+
+    // === MESSAGE ===
+    emergencyStopLabel = new QLabel(
+        "⚠️ ARRÊT D'URGENCE ACTIVÉ ⚠️<br><br>"
+        "Le robot a été arrêté immédiatement.<br>"
+        "La partie est terminée.<br><br>"
+        "Utilisez le bouton ci-dessous pour retourner au menu principal.",
+        emergencyStopWidget
+    );
+    emergencyStopLabel->setAlignment(Qt::AlignCenter);
+    emergencyStopLabel->setWordWrap(true);
+    emergencyStopLabel->setStyleSheet("font-size: 24px; color: #FF0000; font-weight: bold; padding: 20px;");
+    emergencyStopLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    emergencyStopLabel->setMinimumWidth(900);
+
+    // === BOUTON RETOUR AU MENU ===
+    emergencyStopQuitButton = new QPushButton("Retour au menu principal", emergencyStopWidget);
+    emergencyStopQuitButton->setFixedSize(380, 80);
+    emergencyStopQuitButton->setStyleSheet(
+        "QPushButton { background-color: #E0E0E0; color: #1B3B5F; font-size: 26px; font-weight: bold; border-radius: 40px; }"
+        "QPushButton:hover { background-color: #D0D0D0; }"
+        "QPushButton:pressed { background-color: #A8A8A8; }"
+    );
+    emergencyStopQuitButton->setCursor(Qt::PointingHandCursor);
+    connect(emergencyStopQuitButton, &QPushButton::clicked, this, [this]() {
+        qDebug() << "[GameScreen] Bouton 'Retour au menu' cliqué après arrêt d'urgence";
+
+        // Désactiver le bouton immédiatement pour éviter les doubles clics
+        emergencyStopQuitButton->setEnabled(false);
+        emergencyStopQuitButton->setText("Retour au menu en cours...");
+
+        emit emergencyStopQuitRequested();
+    });
+
+    // === LAYOUT ===
+    layout->addSpacing(50);
+    layout->addWidget(titleLabel, 0, Qt::AlignCenter);
+    layout->addSpacing(30);
+    layout->addStretch();
+    layout->addWidget(emergencyStopLabel, 0, Qt::AlignCenter);
+    layout->addStretch();
+    layout->addWidget(emergencyStopQuitButton, 0, Qt::AlignCenter);
+    layout->addSpacing(50);
+}
+
+// ============================================================
+// CRÉATION DU WIDGET D'ERREUR DE CONNEXION
+// ============================================================
+void GameScreen::createConnectionErrorWidget()
+{
+    connectionErrorWidget = new QWidget(this);
+
+    QVBoxLayout *layout = new QVBoxLayout(connectionErrorWidget);
+    layout->setContentsMargins(60, 40, 60, 40);
+    layout->setSpacing(30);
+    layout->setAlignment(Qt::AlignCenter);
+
+    // === TITRE ===
+    QLabel *titleLabel = new QLabel("Erreur de connexion", connectionErrorWidget);
+    titleLabel->setAlignment(Qt::AlignCenter);
+    titleLabel->setStyleSheet("font-size: 60px; font-weight: bold; color: #1B3B5F;");
+
+    // === MESSAGE ===
+    connectionErrorLabel = new QLabel(
+        "Impossible de se connecter au robot.<br><br>"
+        "Vérifiez la connexion USB et cliquez sur 'Réessayer'.",
+        connectionErrorWidget
+    );
+    connectionErrorLabel->setAlignment(Qt::AlignCenter);
+    connectionErrorLabel->setWordWrap(true);
+    connectionErrorLabel->setStyleSheet("font-size: 24px; color: #1B3B5F; font-weight: bold; padding: 20px;");
+    connectionErrorLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    connectionErrorLabel->setMinimumWidth(900);
+
+    // === BOUTONS ===
+    retryConnectionButton = new QPushButton("Réessayer la connexion", connectionErrorWidget);
+    retryConnectionButton->setFixedSize(350, 70);
+    retryConnectionButton->setStyleSheet(
+        "QPushButton { background-color: #2ECC71; color: white; font-size: 24px; font-weight: bold; border-radius: 35px; }"
+        "QPushButton:hover { background-color: #27AE60; }"
+        "QPushButton:pressed { background-color: #1E8449; }"
+    );
+    retryConnectionButton->setCursor(Qt::PointingHandCursor);
+    connect(retryConnectionButton, &QPushButton::clicked, [this]() {
+        stack->setCurrentWidget(initializingWidget);
+        emit prepareGame();  // Réessayer la connexion
+    });
+
+    quitFromConnectionErrorButton = new QPushButton("Retour au menu", connectionErrorWidget);
+    quitFromConnectionErrorButton->setFixedSize(250, 70);
+    quitFromConnectionErrorButton->setStyleSheet(
+        "QPushButton { background-color: #E74C3C; color: white; font-size: 24px; font-weight: bold; border-radius: 35px; }"
+        "QPushButton:hover { background-color: #C0392B; }"
+        "QPushButton:pressed { background-color: #A93226; }"
+    );
+    quitFromConnectionErrorButton->setCursor(Qt::PointingHandCursor);
+    connect(quitFromConnectionErrorButton, &QPushButton::clicked, this, &GameScreen::onQuitButtonClicked);
+
+    QHBoxLayout *buttonLayout = new QHBoxLayout;
+    buttonLayout->addWidget(retryConnectionButton);
+    buttonLayout->addSpacing(30);
+    buttonLayout->addWidget(quitFromConnectionErrorButton);
+
+    // === LAYOUT ===
+    layout->addSpacing(50);
+    layout->addWidget(titleLabel, 0, Qt::AlignCenter);
+    layout->addSpacing(30);
+    layout->addStretch();
+    layout->addWidget(connectionErrorLabel, 0, Qt::AlignCenter);
+    layout->addStretch();
+    layout->addLayout(buttonLayout);
+    layout->addSpacing(50);
 }
 
 // ============================================================
@@ -931,11 +996,5 @@ void GameScreen::resizeEvent(QResizeEvent *event)
     }
     if (resultOverlay && resultOverlay->isVisible()) {
         resultOverlay->setGeometry(gameWidget->rect());
-    }
-    if (connectionErrorOverlay && connectionErrorOverlay->isVisible()) {
-        connectionErrorOverlay->setGeometry(gameWidget->rect());
-    }
-    if (emergencyStopOverlay && emergencyStopOverlay->isVisible()) {
-        emergencyStopOverlay->setGeometry(gameWidget->rect());
     }
 }

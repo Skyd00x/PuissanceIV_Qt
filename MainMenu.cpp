@@ -22,6 +22,11 @@ MainMenu::MainMenu(QWidget *parent)
 
     // === STACK PRINCIPAL ===
     stack = new QStackedWidget(this);
+    stack->setAttribute(Qt::WA_TranslucentBackground, false);
+
+    // IMPORTANT : Empêcher que les widgets animés sortent du stack et affectent les autres éléments
+    stack->setStyleSheet("QStackedWidget { background-color: white; }");
+
     createMainMenu();
     createDifficultyMenu();
     createColorMenu();
@@ -33,8 +38,15 @@ MainMenu::MainMenu(QWidget *parent)
     stack->addWidget(confirmWidget);
     stack->setCurrentWidget(mainMenuWidget);
 
-    // === BOUTON AIDE ===
-    helpButton = new QPushButton("?");
+    // === LAYOUT GLOBAL (SEULEMENT LE STACK) ===
+    QVBoxLayout *global = new QVBoxLayout(this);
+    global->setContentsMargins(0, 0, 0, 0);
+    global->setSpacing(0);
+    global->addWidget(stack, 1);
+    setLayout(global);
+
+    // === BOUTON AIDE (POSITION ABSOLUE - NE BOUGE JAMAIS) ===
+    helpButton = new QPushButton("?", this);
     helpButton->setFixedSize(70, 70);
     helpButton->setStyleSheet(
         "QPushButton {"
@@ -50,34 +62,28 @@ MainMenu::MainMenu(QWidget *parent)
     helpButton->setCursor(Qt::PointingHandCursor);
     connect(helpButton, &QPushButton::clicked, this, &MainMenu::openExplanation);
 
-    // Ombre pour le bouton d’aide
+    // Ombre pour le bouton d'aide
     QGraphicsDropShadowEffect *helpShadow = new QGraphicsDropShadowEffect;
     helpShadow->setBlurRadius(20);
     helpShadow->setOffset(3, 3);
     helpShadow->setColor(QColor(0, 0, 0, 120));
     helpButton->setGraphicsEffect(helpShadow);
 
-    // === LOGO POLYTECH (coin bas droit) ===
-    QLabel *logoLabel = new QLabel(this);
+    // === LOGO POLYTECH (POSITION ABSOLUE - NE BOUGE JAMAIS) ===
+    logoLabel = new QLabel(this);
     QPixmap logo("./Ressources/image/Logo_PolytechTours.png");
     if (!logo.isNull())
         logoLabel->setPixmap(logo.scaled(160, 160, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    logoLabel->setAlignment(Qt::AlignRight | Qt::AlignBottom);
+    logoLabel->setFixedSize(160, 160);
 
-    // === LAYOUT GLOBAL ===
-    QVBoxLayout *global = new QVBoxLayout(this);
-    global->setContentsMargins(0, 0, 0, 0);
-    global->setSpacing(0);
-    global->addWidget(stack, 1);
+    // Les positionner sera fait dans resizeEvent()
+    // Pour le moment, les mettre hors écran
+    helpButton->move(25, height() - 95);
+    logoLabel->move(width() - 185, height() - 185);
 
-    QHBoxLayout *bottomBar = new QHBoxLayout;
-    bottomBar->setContentsMargins(25, 10, 25, 25);
-    bottomBar->addWidget(helpButton, 0, Qt::AlignLeft | Qt::AlignBottom);
-    bottomBar->addStretch();
-    bottomBar->addWidget(logoLabel, 0, Qt::AlignRight | Qt::AlignBottom);
-
-    global->addLayout(bottomBar);
-    setLayout(global);
+    // S'assurer qu'ils sont toujours au-dessus
+    helpButton->raise();
+    logoLabel->raise();
 }
 
 // ============================================================
@@ -366,42 +372,50 @@ void MainMenu::createConfirmationMenu()
 }
 
 // ============================================================
-// TRANSITION PAR GLISSADE DIRECTIONNELLE
+// TRANSITION PAR FONDU CROISÉ (N'AFFECTE PAS LES AUTRES WIDGETS)
 // ============================================================
 void MainMenu::animateTransition(QWidget *from, QWidget *to, bool forward)
 {
+    Q_UNUSED(forward);  // Non utilisé dans le fondu croisé
+
     if (!from || !to) return;
 
-    int w = stack->width();
-    int h = stack->height();
+    // Créer les effets d'opacité
+    QGraphicsOpacityEffect *effectOut = new QGraphicsOpacityEffect(from);
+    QGraphicsOpacityEffect *effectIn = new QGraphicsOpacityEffect(to);
 
-    // Position selon la direction
-    int startXTo = forward ? w : -w;
-    int endXTo   = 0;
-    int endXFrom = forward ? -w : w;
+    from->setGraphicsEffect(effectOut);
+    to->setGraphicsEffect(effectIn);
 
-    to->setGeometry(startXTo, 0, w, h);
+    // Préparer le widget entrant
+    effectIn->setOpacity(0.0);
     to->show();
+    stack->setCurrentWidget(to);  // Changer immédiatement pour éviter les glitches
 
-    auto *slideOut = new QPropertyAnimation(from, "geometry");
-    slideOut->setDuration(400);
-    slideOut->setEasingCurve(QEasingCurve::InOutQuad);
-    slideOut->setStartValue(QRect(0, 0, w, h));
-    slideOut->setEndValue(QRect(endXFrom, 0, w, h));
+    // Animation de fondu sortant
+    auto *fadeOut = new QPropertyAnimation(effectOut, "opacity");
+    fadeOut->setDuration(300);
+    fadeOut->setStartValue(1.0);
+    fadeOut->setEndValue(0.0);
+    fadeOut->setEasingCurve(QEasingCurve::InOutQuad);
 
-    auto *slideIn = new QPropertyAnimation(to, "geometry");
-    slideIn->setDuration(400);
-    slideIn->setEasingCurve(QEasingCurve::InOutQuad);
-    slideIn->setStartValue(QRect(startXTo, 0, w, h));
-    slideIn->setEndValue(QRect(endXTo, 0, w, h));
+    // Animation de fondu entrant
+    auto *fadeIn = new QPropertyAnimation(effectIn, "opacity");
+    fadeIn->setDuration(300);
+    fadeIn->setStartValue(0.0);
+    fadeIn->setEndValue(1.0);
+    fadeIn->setEasingCurve(QEasingCurve::InOutQuad);
 
-    connect(slideOut, &QPropertyAnimation::finished, [this, to]() {
-        stack->setCurrentWidget(to);
+    // Nettoyage après l'animation
+    connect(fadeIn, &QPropertyAnimation::finished, [from, to]() {
+        from->setGraphicsEffect(nullptr);
+        to->setGraphicsEffect(nullptr);
     });
 
+    // Lancer les animations en parallèle
     auto *group = new QParallelAnimationGroup(this);
-    group->addAnimation(slideOut);
-    group->addAnimation(slideIn);
+    group->addAnimation(fadeOut);
+    group->addAnimation(fadeIn);
     group->start(QAbstractAnimation::DeleteWhenStopped);
 }
 
@@ -453,12 +467,35 @@ void MainMenu::onColorSelected()
 // ============================================================
 // AFFICHAGE DES MENUS
 // ============================================================
-void MainMenu::showDifficultyMenu() { animateTransition(stack->currentWidget(), difficultyWidget, true); }
-void MainMenu::showColorMenu() { animateTransition(stack->currentWidget(), colorWidget, true); }
-void MainMenu::showMainMenu() { animateTransition(stack->currentWidget(), mainMenuWidget, false); }
+void MainMenu::showDifficultyMenu()
+{
+    // Cacher le bouton d'aide et le logo dans les sous-menus
+    helpButton->hide();
+    logoLabel->hide();
+    animateTransition(stack->currentWidget(), difficultyWidget, true);
+}
+
+void MainMenu::showColorMenu()
+{
+    // Cacher le bouton d'aide et le logo dans les sous-menus
+    helpButton->hide();
+    logoLabel->hide();
+    animateTransition(stack->currentWidget(), colorWidget, true);
+}
+
+void MainMenu::showMainMenu()
+{
+    // Réafficher le bouton d'aide et le logo dans le menu principal
+    helpButton->show();
+    logoLabel->show();
+    animateTransition(stack->currentWidget(), mainMenuWidget, false);
+}
 
 void MainMenu::showConfirmationMenu(const QString &text, ConfirmationType type)
 {
+    // Cacher le bouton d'aide et le logo dans les sous-menus
+    helpButton->hide();
+    logoLabel->hide();
     confirmLabel->setText(text);
     currentConfirm = type;
     animateTransition(stack->currentWidget(), confirmWidget, true);
@@ -472,4 +509,26 @@ void MainMenu::resetToMainMenu()
     // Retourne directement au menu principal sans animation
     stack->setCurrentWidget(mainMenuWidget);
     currentConfirm = ConfirmationType::None;
+
+    // Réafficher le bouton d'aide et le logo
+    helpButton->show();
+    logoLabel->show();
+}
+
+// ============================================================
+// REPOSITIONNEMENT DU BOUTON D'AIDE ET DU LOGO LORS DU RESIZE
+// ============================================================
+void MainMenu::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+
+    // Repositionner le bouton d'aide (coin bas gauche)
+    helpButton->move(25, height() - 95);
+
+    // Repositionner le logo Polytech (complètement dans le coin bas droit)
+    logoLabel->move(width() - 185, height() - 185);
+
+    // S'assurer qu'ils restent au-dessus pendant les animations
+    helpButton->raise();
+    logoLabel->raise();
 }

@@ -93,6 +93,12 @@ void GameLogic::prepareGame()
                 robotConnected = false;
                 return;
             }
+
+            // Vérifier si l'arrêt d'urgence a été activé
+            if (!preparationRunning) {
+                qDebug() << "[GameLogic] Arrêt d'urgence détecté après connexion, abandon de la préparation";
+                return;
+            }
             qDebug() << "[GameLogic] Robot connecté avec succès";
 
             // Remise en position initiale DIRECTEMENT via robot->Home()
@@ -100,6 +106,12 @@ void GameLogic::prepareGame()
             qDebug() << "[GameLogic] ⚠️ APPEL UNIQUE À robot->Home() depuis GameLogic::prepareGame() thread";
             robot->Home();
             qDebug() << "[GameLogic] ✅ robot->Home() TERMINÉ depuis GameLogic::prepareGame() thread";
+
+            // Vérifier si l'arrêt d'urgence a été activé pendant le Home
+            if (!preparationRunning) {
+                qDebug() << "[GameLogic] Arrêt d'urgence détecté après Home(), abandon de la préparation";
+                return;
+            }
             qDebug() << "[GameLogic] Remise en position initiale terminée";
 
             // Fermer la pince pour être prêt à jouer
@@ -107,11 +119,23 @@ void GameLogic::prepareGame()
             robot->closeGripper();
             std::this_thread::sleep_for(std::chrono::milliseconds(300));
             robot->turnOffGripper();
+
+            // Vérifier si l'arrêt d'urgence a été activé
+            if (!preparationRunning) {
+                qDebug() << "[GameLogic] Arrêt d'urgence détecté après fermeture pince, abandon de la préparation";
+                return;
+            }
             qDebug() << "[GameLogic] Pince fermée";
 
             // Se positionner au-dessus du réservoir gauche pour être prêt à jouer
             qDebug() << "[GameLogic] Déplacement au-dessus du réservoir gauche...";
             calib->goToLeftReservoirArea();
+
+            // Vérifier si l'arrêt d'urgence a été activé
+            if (!preparationRunning) {
+                qDebug() << "[GameLogic] Arrêt d'urgence détecté après déplacement réservoir, abandon de la préparation";
+                return;
+            }
             qDebug() << "[GameLogic] Positionné au-dessus du réservoir gauche";
 
             // Marquer comme prêt
@@ -220,6 +244,62 @@ void GameLogic::stopGame()
     }
 
     qDebug() << "[GameLogic] === PARTIE ARRÊTÉE ===";
+}
+
+// =============================================================
+//   EMERGENCY STOP GAME — arrêt d'urgence
+// =============================================================
+void GameLogic::emergencyStopGame()
+{
+    qDebug() << "[GameLogic] === ARRÊT D'URGENCE DE LA PARTIE ===";
+    qDebug() << "[GameLogic] NOTE : Le robot a déjà été déconnecté par MainWindow::emergencyDisconnect()";
+
+    gameRunning = false;
+    negamaxRunning = false;
+    preparationRunning = false;
+
+    camera->stop();
+
+    // Réinitialiser tous les compteurs et états
+    gridConfirmCount = 0;
+    stabilityConfirmCount = 0;
+    waitingForStableGrid = false;
+    candidateGrid.clear();
+    referenceGrid.clear();
+    stableCandidate.clear();
+    currentTurn = PlayerTurn;
+    lastRobotColumn = -1;
+
+    // Attendre proprement la fin du thread du robot (timeout court : 2 secondes max)
+    if (negamaxThreadObj) {
+        if (negamaxThreadObj->isRunning()) {
+            qDebug() << "[GameLogic] Attente de la fin du thread robot (timeout 2s)...";
+            negamaxThreadObj->quit();
+
+            // Timeout court car le thread devrait se terminer rapidement grâce au flag emergencyStopFlag
+            if (!negamaxThreadObj->wait(2000)) {
+                qWarning() << "[GameLogic] Le thread robot ne s'est pas terminé en 2s, abandon (fuite mémoire)";
+                negamaxThreadObj = nullptr;  // Perdre la référence, le thread finira tout seul
+            } else {
+                qDebug() << "[GameLogic] Thread robot terminé proprement";
+                delete negamaxThreadObj;
+                negamaxThreadObj = nullptr;
+            }
+        } else {
+            delete negamaxThreadObj;
+            negamaxThreadObj = nullptr;
+        }
+    }
+
+    // NE PAS déconnecter le robot ici - c'est déjà fait par MainWindow::emergencyDisconnect()
+    // NE PAS toucher à la pince - le robot est déjà déconnecté
+    // Juste mettre à jour les flags
+    robotConnected = false;
+    if (calib) {
+        calib->setConnectedState(false);
+    }
+
+    qDebug() << "[GameLogic] === ARRÊT D'URGENCE TERMINÉ ===";
 }
 
 // =============================================================
