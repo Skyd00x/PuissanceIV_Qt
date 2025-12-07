@@ -509,7 +509,7 @@ void GameScreen::resetGame()
     timerLabel->setText("00:00");
 
     // Réinitialiser les flags
-    allowGridWarning = false;
+    allowGridWarning = false;  // Désactivé jusqu'après le countdown
     countdownValue = 3;
 
     // Cacher tous les overlays
@@ -564,7 +564,8 @@ void GameScreen::startGame()
 // ============================================================
 void GameScreen::startCountdownWhenReady()
 {
-    // Réinitialiser le flag d'avertissement de grille
+    // Désactiver les avertissements pendant le countdown
+    // (ils seront activés après le "GO!")
     allowGridWarning = false;
 
     // Lancer le countdown maintenant que le robot est prêt
@@ -606,9 +607,9 @@ void GameScreen::updateCountdown()
             chronometer.start(1000);
             emit countdownFinished();
 
-            // Activer les avertissements de grille après 5 secondes
-            // (temps pour que la caméra s'initialise correctement)
-            gridWarningDelayTimer.start(5000);
+            // Activer les avertissements de grille maintenant (pas de tempo)
+            // La caméra a eu le temps de se stabiliser pendant la connexion et le countdown
+            allowGridWarning = true;
         });
     }
     else

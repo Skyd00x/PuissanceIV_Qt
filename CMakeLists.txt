@@ -11,10 +11,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ============================================================
-# === Qt
+# === Qt6 (UNIQUEMENT)
 # ============================================================
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools)
+find_package(Qt6 REQUIRED COMPONENTS Widgets LinguistTools)
 
 set(TS_FILES PuissanceIV_QT_fr_FR.ts)
 
@@ -52,20 +51,15 @@ file(COPY ${CMAKE_SOURCE_DIR}/Ressources DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY ${CMAKE_SOURCE_DIR}/Model DESTINATION ${CMAKE_BINARY_DIR})
 
 # ============================================================
-# === EXÉCUTABLE
+# === EXÉCUTABLE (Qt6)
 # ============================================================
-if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
-    qt_add_executable(PuissanceIV_QT
-        MANUAL_FINALIZATION
-        ${PROJECT_SOURCES}
-        GameLogic.hpp GameLogic.cpp
-        app_icon.rc
-    )
-    qt_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
-else()
-    add_executable(PuissanceIV_QT ${PROJECT_SOURCES})
-    qt5_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
-endif()
+qt_add_executable(PuissanceIV_QT
+    MANUAL_FINALIZATION
+    ${PROJECT_SOURCES}
+    GameLogic.hpp GameLogic.cpp
+    app_icon.rc
+)
+qt_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
 
 # ============================================================
 # === OpenCV
@@ -75,7 +69,7 @@ include_directories("${OpenCV_DIR}/include")
 link_directories("${OpenCV_DIR}/x64/vc16/lib")
 
 file(GLOB OPENCV_LIBS "${OpenCV_DIR}/x64/vc16/lib/*.lib")
-message(STATUS "✅ OpenCV libs trouvées : ${OPENCV_LIBS}")
+message(STATUS "OpenCV libs trouvées : ${OPENCV_LIBS}")
 
 file(GLOB OPENCV_DLLS "${OpenCV_DIR}/x64/vc16/bin/opencv_world*.dll")
 if (OPENCV_DLLS)
@@ -93,9 +87,11 @@ set(DOBOT_DIR "${CMAKE_SOURCE_DIR}/Dobot")
 include_directories("${DOBOT_DIR}")
 link_directories("${DOBOT_DIR}")
 
+# Copier toutes les DLL nécessaires du SDK Dobot (y compris Qt5)
+file(GLOB DOBOT_DLLS "${DOBOT_DIR}/*.dll")
 add_custom_command(TARGET PuissanceIV_QT POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${DOBOT_DIR}/DobotDll.dll"
+        ${DOBOT_DLLS}
         $<TARGET_FILE_DIR:PuissanceIV_QT>
 )
 
@@ -110,14 +106,14 @@ include_directories("${CMAKE_SOURCE_DIR}/libtorch/include")
 include_directories("${CMAKE_SOURCE_DIR}/libtorch/include/torch/csrc/api/include")
 link_directories("${CMAKE_SOURCE_DIR}/libtorch/lib")
 
-message(STATUS "✅ LibTorch trouvé : ${TORCH_LIBRARIES}")
+message(STATUS "LibTorch trouvé : ${TORCH_LIBRARIES}")
 
 # ============================================================
 # === LIENS DES LIBRAIRIES
 # ============================================================
 target_link_libraries(PuissanceIV_QT
     PRIVATE
-        Qt${QT_VERSION_MAJOR}::Widgets
+        Qt6::Widgets
         ${OPENCV_LIBS}
         "${DOBOT_DIR}/DobotDll.lib"
         ${TORCH_LIBRARIES}
@@ -133,20 +129,15 @@ add_custom_command(TARGET PuissanceIV_QT POST_BUILD
 )
 
 # ============================================================
-# === PROPRIÉTÉS DE L’EXÉCUTABLE
+# === PROPRIÉTÉS DE L'EXÉCUTABLE (Qt6)
 # ============================================================
-if(${QT_VERSION} VERSION_LESS 6.1.0)
-    set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.PuissanceIV_QT)
-endif()
-
 set_target_properties(PuissanceIV_QT PROPERTIES
-    ${BUNDLE_ID_OPTION}
+    OUTPUT_NAME "Puissance IV"
+    MACOSX_BUNDLE_GUI_IDENTIFIER com.example.PuissanceIV_QT
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
     MACOSX_BUNDLE TRUE
     WIN32_EXECUTABLE TRUE
 )
 
-if(QT_VERSION_MAJOR EQUAL 6)
-    qt_finalize_executable(PuissanceIV_QT)
-endif()
+qt_finalize_executable(PuissanceIV_QT)

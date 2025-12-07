@@ -70,6 +70,20 @@ void GameLogic::prepareGame()
     robotColor = sm->getRobotColorValue();    // Inverse du joueur
     qDebug() << "[GameLogic] Couleur joueur:" << playerColor << "- Couleur robot:" << robotColor;
 
+    // Démarrer la caméra IMMÉDIATEMENT pour qu'elle ait le temps de se stabiliser
+    // pendant la connexion du robot et le compte à rebours
+    qDebug() << "[GameLogic] Démarrage anticipé de la caméra...";
+    camera->start(0);
+
+    // Texte de difficulté
+    QString diffString;
+    switch (sm->getDifficulty()) {
+    case StateMachine::Easy: diffString = "Facile"; break;
+    case StateMachine::Medium: diffString = "Normal"; break;
+    case StateMachine::Hard: diffString = "Difficile"; break;
+    }
+    emit difficultyText(diffString);
+
     // Connexion au robot (seulement si pas déjà connecté)
     if (!robotConnected) {
         if (preparationRunning) {
@@ -181,18 +195,8 @@ void GameLogic::startGame()
     qDebug() << "[GameLogic] === DÉMARRAGE DE LA PARTIE ===";
     gameRunning = true;
 
-    // Démarrage caméra
-    qDebug() << "[GameLogic] Démarrage de la caméra...";
-    camera->start(0);
-
-    // Texte de difficulté
-    QString diffString;
-    switch (sm->getDifficulty()) {
-    case StateMachine::Easy: diffString = "Facile"; break;
-    case StateMachine::Medium: diffString = "Normal"; break;
-    case StateMachine::Hard: diffString = "Difficile"; break;
-    }
-    emit difficultyText(diffString);
+    // La caméra a déjà été démarrée dans prepareGame()
+    // Pas besoin de la redémarrer ici
 
     // Le joueur commence
     currentTurn = PlayerTurn;
