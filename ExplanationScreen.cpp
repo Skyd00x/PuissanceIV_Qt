@@ -1,5 +1,8 @@
 #include "ExplanationScreen.hpp"
+#include "ResourcesPath.hpp"
 #include <QPalette>
+#include <QPixmap>
+#include <QDebug>
 
 ExplanationScreen::ExplanationScreen(QWidget *parent)
     : QWidget(parent)
@@ -27,14 +30,26 @@ ExplanationScreen::ExplanationScreen(QWidget *parent)
     connect(backButton, &QPushButton::clicked, this, &ExplanationScreen::backToMenu);
 
     // === TITRE ===
-    QLabel *titleLabel = new QLabel("Aide", this);
+    QLabel *titleLabel = new QLabel("Fonctionnement du jeu", this);
     titleLabel->setAlignment(Qt::AlignCenter);
     titleLabel->setStyleSheet("font-size: 60px; font-weight: bold; color: #1B3B5F;");
 
-    // === CONTENU ===
-    QLabel *label = new QLabel("Explication du jeu (placeholder)", this);
-    label->setStyleSheet("font-size: 28px; color: #1B3B5F;");
-    label->setAlignment(Qt::AlignCenter);
+    // === IMAGE D'EXPLICATION ===
+    QLabel *imageLabel = new QLabel(this);
+    QString imagePath = getResourcePath("image/fonctionnement.png");
+
+    QPixmap image(imagePath);
+    if (image.isNull()) {
+        qWarning() << "[ExplanationScreen] Impossible de charger l'image:" << imagePath;
+        // Afficher un message de fallback si l'image n'est pas trouvée
+        imageLabel->setText("Image d'explication non disponible");
+        imageLabel->setStyleSheet("font-size: 24px; color: red;");
+    } else {
+        // Afficher l'image en la redimensionnant pour qu'elle tienne dans l'écran
+        // Garder le ratio et limiter la taille max à 1000x600 pixels
+        imageLabel->setPixmap(image.scaled(1000, 600, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    }
+    imageLabel->setAlignment(Qt::AlignCenter);
 
     // === LAYOUT ===
     layout->addWidget(backButton, 0, Qt::AlignLeft);
@@ -42,6 +57,6 @@ ExplanationScreen::ExplanationScreen(QWidget *parent)
     layout->addWidget(titleLabel, 0, Qt::AlignCenter);
     layout->addSpacing(20);
     layout->addStretch();
-    layout->addWidget(label, 0, Qt::AlignCenter);
+    layout->addWidget(imageLabel, 0, Qt::AlignCenter);
     layout->addStretch();
 }
