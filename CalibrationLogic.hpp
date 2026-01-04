@@ -78,6 +78,10 @@ public:
     void saveCalibration(const QString& path);
     void loadCalibration(const QString& path);
 
+    // Surcharges utilisant automatiquement le chemin AppData (recommandé)
+    void saveCalibration() { saveCalibration(getCalibrationPath()); }
+    void loadCalibration() { loadCalibration(getCalibrationPath()); }
+
     // Accès direct par enum
     Pose getPosition(CalibPoint p) const {
         return calibratedPoints[(int)p];
@@ -115,6 +119,7 @@ signals:
     void gripperStateChanged(bool isOpen);  // Signal émis quand l'état de la pince change
 
 private:
+    QString getCalibrationPath() const;  // Retourne le chemin du fichier de calibration dans AppData
     std::vector<Pose> interpolatePoints(const Pose& start, const Pose& end, int count);
     void computeIntermediatePositions();  // Calcule les positions intermédiaires à partir des points clé
 

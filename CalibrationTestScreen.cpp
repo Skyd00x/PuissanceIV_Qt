@@ -267,7 +267,7 @@ void CalibrationTestScreen::runTest() {
     // IMPORTANT: Recharger la calibration depuis le fichier avant le test
     // (car elle peut avoir été réinitialisée si l'utilisateur a quitté l'écran de calibration)
     qDebug() << "[CalibrationTestScreen] Rechargement de la calibration depuis le fichier...";
-    calib->loadCalibration("./calibration.json");
+    calib->loadCalibration();
 
     // Connexion au robot (avec affichage du bouton Réessayer en cas d'échec)
     if (!calib->connectToRobot()) {

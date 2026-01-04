@@ -3,6 +3,8 @@
 #include <chrono>
 #include <QMetaObject>
 #include <QDebug>
+#include <QStandardPaths>
+#include <QDir>
 #include <cmath>
 
 CalibrationLogic::CalibrationLogic(Robot* robot, QObject* parent)
@@ -56,7 +58,7 @@ CalibrationLogic::CalibrationLogic(Robot* robot, QObject* parent)
     };
 
     // Charger les positions calibrées si elles existent
-    loadCalibration("./calibration.json");
+    loadCalibration(getCalibrationPath());
 }
 
 // === Connexion au robot ===
@@ -198,7 +200,7 @@ void CalibrationLogic::recordStep(int index) {
         qDebug() << "[CalibrationLogic] 🔄 Étape finale : calcul des positions intermédiaires...";
         computeIntermediatePositions();
         qDebug() << "[CalibrationLogic] 💾 Sauvegarde de tous les points...";
-        saveCalibration("./calibration.json");
+        saveCalibration(getCalibrationPath());
 
         // La progression est déjà à 8/8 grâce à progressChanged(index + 1) ci-dessus
         emit calibrationFinished();
@@ -488,6 +490,24 @@ void CalibrationLogic::goToGridArea() {
     if (!robot->goToSecurized(target, gridZ)) {
         qWarning() << "[CalibrationLogic] ❌ ERREUR : Impossible d'atteindre la grille";
     }
+}
+
+// === Obtenir le chemin du fichier de calibration ===
+QString CalibrationLogic::getCalibrationPath() const {
+    // Utiliser AppDataLocation pour stocker les données de l'application
+    // Ce dossier est toujours accessible en écriture, même dans Program Files
+    QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+
+    // Créer le dossier s'il n'existe pas
+    QDir dir(appData);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+        qDebug() << "[CalibrationLogic] Création du dossier de données:" << appData;
+    }
+
+    QString calibPath = appData + "/calibration.json";
+    qDebug() << "[CalibrationLogic] Chemin de calibration:" << calibPath;
+    return calibPath;
 }
 
 // === Sauvegarde ===
