@@ -1,4 +1,5 @@
 #include "MainWindow.hpp"
+#include "ResourcesPath.hpp"
 #include <QCloseEvent>
 #include <QDebug>
 #include <QTimer>
@@ -9,7 +10,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     setWindowTitle("Puissance IV");
     setMinimumSize(1280, 720);
-    setWindowIcon(QIcon("./Ressources/image/icon.png"));
+    setWindowIcon(QIcon(getResourcePath("image/icon.png")));
 
     // === STACK PRINCIPAL ===
     stack = new QStackedWidget(this);

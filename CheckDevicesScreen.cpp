@@ -1,6 +1,7 @@
 #include "CheckDevicesScreen.hpp"
 #include "CameraAi.hpp"
 #include "Robot.hpp"
+#include "ResourcesPath.hpp"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -54,11 +55,11 @@ CheckDevicesScreen::CheckDevicesScreen(QWidget *parent)
 
     // === Icônes ===
     cameraIcon = new QLabel(this);
-    cameraIcon->setPixmap(loadImage("./Ressources/image/camera.png", {128,128}));
+    cameraIcon->setPixmap(loadImage(getResourcePath("image/camera.png"), {128,128}));
     cameraIcon->setAlignment(Qt::AlignCenter);
 
     robotIcon = new QLabel(this);
-    robotIcon->setPixmap(loadImage("./Ressources/image/robot.png", {128,128}));
+    robotIcon->setPixmap(loadImage(getResourcePath("image/robot.png"), {128,128}));
     robotIcon->setAlignment(Qt::AlignCenter);
 
     // === Labels statut ===
@@ -149,8 +150,8 @@ void CheckDevicesScreen::startChecking()
 
 void CheckDevicesScreen::updateStatus(bool cameraOk, bool robotOk)
 {
-    auto imgOk  = QPixmap("./Ressources/image/check_green.png");
-    auto imgBad = QPixmap("./Ressources/image/cross_red.png");
+    auto imgOk  = QPixmap(getResourcePath("image/check_green.png"));
+    auto imgBad = QPixmap(getResourcePath("image/cross_red.png"));
 
     cameraStatusIcon->setPixmap((cameraOk ? imgOk : imgBad)
                                     .scaled(48,48,Qt::KeepAspectRatio,Qt::SmoothTransformation));

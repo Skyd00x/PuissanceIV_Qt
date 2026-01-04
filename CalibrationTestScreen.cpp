@@ -1,4 +1,5 @@
 #include "CalibrationTestScreen.hpp"
+#include "ResourcesPath.hpp"
 #include <QPalette>
 #include <QFont>
 #include <QDebug>
@@ -53,7 +54,7 @@ CalibrationTestScreen::CalibrationTestScreen(Robot *robot, CalibrationLogic* cal
 
     // === LOADING ===
     loadingLabel = new QLabel(this);
-    loadingMovie = new QMovie("./Ressources/image/Gifs/simple_loading.gif");
+    loadingMovie = new QMovie(getResourcePath("image/Gifs/simple_loading.gif"));
     loadingLabel->setMovie(loadingMovie);
     loadingLabel->setFixedSize(85, 85);
     loadingLabel->setScaledContents(true);

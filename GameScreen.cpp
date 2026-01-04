@@ -1,4 +1,5 @@
 #include "GameScreen.hpp"
+#include "ResourcesPath.hpp"
 #include <QPixmap>
 #include <QFont>
 #include <QPalette>
@@ -453,7 +454,7 @@ void GameScreen::createInitializingWidget()
 
     // Animation de chargement (comme dans CalibrationScreen)
     initializingLoadingLabel = new QLabel(initializingWidget);
-    initializingLoadingMovie = new QMovie("./Ressources/image/Gifs/simple_loading.gif");
+    initializingLoadingMovie = new QMovie(getResourcePath("image/Gifs/simple_loading.gif"));
     initializingLoadingLabel->setMovie(initializingLoadingMovie);
     initializingLoadingLabel->setFixedSize(85, 85);
     initializingLoadingLabel->setScaledContents(true);

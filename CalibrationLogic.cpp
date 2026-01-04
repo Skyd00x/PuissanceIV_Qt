@@ -1,4 +1,5 @@
 #include "CalibrationLogic.hpp"
+#include "ResourcesPath.hpp"
 #include <thread>
 #include <chrono>
 #include <QMetaObject>
@@ -28,33 +29,33 @@ CalibrationLogic::CalibrationLogic(Robot* robot, QObject* parent)
     steps = {
         // Étape 0 : Instructions initiales
         { "Remplissez les réservoirs gauche et droite avec le maximum de pions.<br>",
-         "./Ressources/image/Calibration/Etape1.png", true, false, false, false, false, false, false },
+         getResourcePath("image/Calibration/Etape1.png"), true, false, false, false, false, false, false },
 
         // Étapes 1-2 : Réservoir gauche (seulement 1 et 4)
         { "Positionnez le robot à l'emplacement <b>1</b> du réservoir de gauche, de façon à ce qu'il puisse prendre le pion correctement avec la pince.",
-         "./Ressources/image/Calibration/Etape2.png", true, true, true, true, false, false, false },
+         getResourcePath("image/Calibration/Etape2.png"), true, true, true, true, false, false, false },
         { "Positionnez le robot à l'emplacement <b>4</b> du réservoir de gauche, de façon à ce qu'il puisse prendre le pion correctement avec la pince.",
-         "./Ressources/image/Calibration/Etape3.png", true, true, true, true, false, false, false },
+         getResourcePath("image/Calibration/Etape3.png"), true, true, true, true, false, false, false },
 
         // Étapes 3-4 : Réservoir droit (seulement 1 et 4)
         { "Positionnez le robot à l'emplacement <b>1</b> du réservoir de droite, de façon à ce qu'il puisse prendre le pion correctement avec la pince.",
-         "./Ressources/image/Calibration/Etape4.png", true, true, true, true, false, false, false },
+         getResourcePath("image/Calibration/Etape4.png"), true, true, true, true, false, false, false },
         { "Positionnez le robot à l'emplacement <b>4</b> du réservoir de droite, de façon à ce qu'il puisse prendre le pion correctement avec la pince.",
-         "./Ressources/image/Calibration/Etape5.png", true, true, true, true, false, false, false },
+         getResourcePath("image/Calibration/Etape5.png"), true, true, true, true, false, false, false },
 
         // Étapes 5-7 : Grille (colonnes 1, 4 et 7 pour précision maximale)
         { "Avec la pince fermée tenant un pion, positionnez le à la <b>première colonne</b> de la grille, de façon à ce qu'il puisse lâcher le pion correctement.",
-         "./Ressources/image/Calibration/Etape6.png", true, true, true, true, false, false, false },
+         getResourcePath("image/Calibration/Etape6.png"), true, true, true, true, false, false, false },
         { "Avec la pince fermée tenant un pion, positionnez le à la <b>colonne centrale</b> de la grille, de façon à ce qu'il puisse lâcher le pion correctement.",
-         "./Ressources/image/Calibration/Etape7.png", true, true, true, true, false, false, false },
+         getResourcePath("image/Calibration/Etape7.png"), true, true, true, true, false, false, false },
         { "Avec la pince fermée tenant un pion, positionnez le à la <b>dernière colonne</b> de la grille, de façon à ce qu'il puisse lâcher le pion correctement.",
-         "./Ressources/image/Calibration/Etape8.png", true, true, true, true, false, false, false },
+         getResourcePath("image/Calibration/Etape8.png"), true, true, true, true, false, false, false },
 
         // Étape 8 : Fin
         { "Calibration terminée.<br>"
          "Toutes les positions ont été enregistrées.<br>"
          "Vous pouvez maintenant retourner au menu principal, ou recommencer si besoin.",
-         "./Ressources/image/welcome_calibration.png", false, false, false, false, false, true, true }
+         getResourcePath("image/welcome_calibration.png"), false, false, false, false, false, true, true }
     };
 
     // Charger les positions calibrées si elles existent

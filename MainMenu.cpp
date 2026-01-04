@@ -1,4 +1,5 @@
 #include "MainMenu.hpp"
+#include "ResourcesPath.hpp"
 #include <QPixmap>
 #include <QSpacerItem>
 #include <QParallelAnimationGroup>
@@ -71,7 +72,7 @@ MainMenu::MainMenu(QWidget *parent)
 
     // === LOGO POLYTECH (POSITION ABSOLUE - NE BOUGE JAMAIS) ===
     logoLabel = new QLabel(this);
-    QPixmap logo("./Ressources/image/Logo_PolytechTours.png");
+    QPixmap logo(getResourcePath("image/Logo_PolytechTours.png"));
     if (!logo.isNull())
         logoLabel->setPixmap(logo.scaled(160, 160, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     logoLabel->setFixedSize(160, 160);
@@ -95,7 +96,7 @@ void MainMenu::createMainMenu()
 
     // === IMAGE ===
     QLabel *leftImage = new QLabel;
-    QPixmap imgLeft("./Ressources/image/menu_principal.png");
+    QPixmap imgLeft(getResourcePath("image/menu_principal.png"));
     if (!imgLeft.isNull()) {
         leftImage->setPixmap(imgLeft.scaled(450, 450, Qt::KeepAspectRatio, Qt::SmoothTransformation));
         // Rendre l'image arrondie

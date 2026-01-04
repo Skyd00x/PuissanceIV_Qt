@@ -1,4 +1,5 @@
 #include "IntroScreen.hpp"
+#include "ResourcesPath.hpp"
 #include <QPixmap>
 #include <QFile>
 #include <QDebug>
@@ -28,9 +29,9 @@ IntroScreen::IntroScreen(QWidget *parent)
     paragraphLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     paragraphLabel->setMaximumWidth(1200);
 
-    // === Bloc d’avertissement (icône + texte) ===
+    // === Bloc d'avertissement (icône + texte) ===
     QLabel* warningIcon = new QLabel(this);
-    QString warningPath = "./Ressources/image/warning.png";
+    QString warningPath = getResourcePath("image/warning.png");
     if (!QFile::exists(warningPath))
         qWarning() << "Warning icon introuvable :" << warningPath;
 
@@ -59,7 +60,7 @@ IntroScreen::IntroScreen(QWidget *parent)
 
     // === Logo Polytech ===
     logoLabel = new QLabel(this);
-    QString logoPath = "./Ressources/image/Logo_PolytechTours.png";
+    QString logoPath = getResourcePath("image/Logo_PolytechTours.png");
     if (!QFile::exists(logoPath))
         qWarning() << "Logo introuvable :" << logoPath;
 

@@ -1,4 +1,5 @@
 #include "CalibrationScreen.hpp"
+#include "ResourcesPath.hpp"
 #include <QPalette>
 #include <QFont>
 #include <QDebug>
@@ -55,7 +56,7 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         introLabel->setMinimumWidth(900);
 
         loadingLabel = new QLabel(this);
-        loadingMovie = new QMovie("./Ressources/image/Gifs/simple_loading.gif");
+        loadingMovie = new QMovie(getResourcePath("image/Gifs/simple_loading.gif"));
         loadingLabel->setMovie(loadingMovie);
         loadingLabel->setFixedSize(85, 85);
         loadingLabel->setScaledContents(true);
@@ -90,7 +91,7 @@ CalibrationScreen::CalibrationScreen(Robot *robot, QWidget *parent)
         imageLabel = new QLabel(this);
         imageLabel->setAlignment(Qt::AlignCenter);
         imageLabel->setFixedSize(500, 500);
-        applyRoundedImageEffect(imageLabel, "./Ressources/image/Calibration/welcome_calibration.png");
+        applyRoundedImageEffect(imageLabel, getResourcePath("image/Calibration/welcome_calibration.png"));
 
         auto *shadow = new QGraphicsDropShadowEffect(imageLabel);
         shadow->setBlurRadius(30);
