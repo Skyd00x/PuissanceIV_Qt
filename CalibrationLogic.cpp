@@ -4,7 +4,7 @@
 #include <chrono>
 #include <QMetaObject>
 #include <QDebug>
-#include <QStandardPaths>
+#include <QCoreApplication>
 #include <QDir>
 #include <cmath>
 
@@ -495,18 +495,11 @@ void CalibrationLogic::goToGridArea() {
 
 // === Obtenir le chemin du fichier de calibration ===
 QString CalibrationLogic::getCalibrationPath() const {
-    // Utiliser AppDataLocation pour stocker les données de l'application
-    // Ce dossier est toujours accessible en écriture, même dans Program Files
-    QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    // Utiliser le dossier de l'exécutable pour stocker le fichier de calibration
+    // Cela permet d'avoir un fichier portable avec l'application, même en mode administrateur
+    QString exePath = QCoreApplication::applicationDirPath();
+    QString calibPath = exePath + "/calibration.json";
 
-    // Créer le dossier s'il n'existe pas
-    QDir dir(appData);
-    if (!dir.exists()) {
-        dir.mkpath(".");
-        qDebug() << "[CalibrationLogic] Création du dossier de données:" << appData;
-    }
-
-    QString calibPath = appData + "/calibration.json";
     qDebug() << "[CalibrationLogic] Chemin de calibration:" << calibPath;
     return calibPath;
 }
