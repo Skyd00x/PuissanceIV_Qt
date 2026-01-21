@@ -633,7 +633,7 @@ void GameLogic::launchRobotTurn()
     switch (sm->getDifficulty()) {
     case StateMachine::Easy: depth = 3; break;
     case StateMachine::Medium: depth = 5; break;
-    case StateMachine::Hard: depth = 6; break;
+    case StateMachine::Hard: depth = 13; break;
     }
 
     qDebug() << "[GameLogic] Lancement du thread negamax avec profondeur=" << depth;
